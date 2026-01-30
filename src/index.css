@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@theme {
+  --color-teddy-brown: #8D5524;
+  --color-teddy-dark: #5D3A1A;
+  --color-teddy-light: #C68642;
+  --color-honey: #E0C097;
+  --color-cream: #FCF5EB;
+  --color-soft-pink: #F4C2C2;
+  --color-bear-nose: #3C2F2F;
+
+  --rounded-bear: 2rem;
+}
+
+@layer base {
+  body {
+    @apply bg-cream text-teddy-dark font-sans;
+  }
+}
+
+@layer components {
+  .bear-card {
+    @apply bg-white rounded-[2rem] shadow-lg border-4 border-honey p-6 hover:shadow-xl transition-shadow;
+  }
+
+  .bear-button {
+    @apply bg-teddy-brown text-white font-bold py-2 px-6 rounded-full hover:bg-teddy-dark transition-colors shadow-md active:scale-95;
+  }
+
+  .bear-input {
+    @apply bg-white border-2 border-honey rounded-xl py-2 px-4 focus:outline-none focus:border-teddy-brown transition-colors;
+  }
+}
+
+/* Custom Scoped CSS Patterns */
+.bear-glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.prose-teddy {
+  --tw-prose-body: var(--color-teddy-dark);
+  --tw-prose-headings: var(--color-teddy-brown);
+  --tw-prose-links: var(--color-teddy-light);
+  --tw-prose-bold: var(--color-teddy-dark);
+  --tw-prose-bullets: var(--color-honey);
+  --tw-prose-quotes: var(--color-teddy-light);
+  --tw-prose-code: var(--color-teddy-brown);
+  --tw-prose-pre-bg: var(--color-cream);
+  --tw-prose-hr: var(--color-honey);
+}
+
+.prose {
+  line-height: 1.75;
+}
+
+.prose h1,
+.prose h2,
+.prose h3 {
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
+.prose p {
+  margin-bottom: 1.25rem;
+}
+
+.prose ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.prose li {
+  margin-bottom: 0.5rem;
+}
