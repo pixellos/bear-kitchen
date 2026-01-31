@@ -7,6 +7,6 @@ export default defineConfig({
     tailwindcss(),
     solid()
   ],
-  base: './', // for GH Pages
+  base: '/bear-kitchen/', // for GH Pages
 })
 

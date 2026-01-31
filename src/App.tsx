@@ -7,7 +7,7 @@ import Nav from './components/Nav';
 
 const App: Component = () => {
   return (
-    <Router>
+    <Router base="/bear-kitchen">
       <div class="min-h-screen flex flex-col">
         <Nav />
         <main class="flex-1 container mx-auto px-4 py-8 max-w-4xl">
