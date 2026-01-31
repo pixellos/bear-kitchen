@@ -160,6 +160,7 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
                                     <li>Create Project &gt; Enable "Google Drive API"</li>
                                     <li>Credentials &gt; Create OAuth Client ID (Web App)</li>
                                     <li>Add <code>{window.location.origin}</code> to Authorized Origins</li>
+                                    <li><b>Crucial:</b> Go to "OAuth consent screen" and add your email to "Test users"!</li>
                                     <li>Paste Client ID below:</li>
                                 </ol>
                                 <input
