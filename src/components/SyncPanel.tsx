@@ -8,7 +8,7 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
     const [status, setStatus] = createSignal('');
     const DEFAULT_CLIENT_ID = '924117517575-jm3a3911vbrusf356d11p6nag7paps0k.apps.googleusercontent.com';
     const [clientId, setClientId] = createSignal(localStorage.getItem('bear_kitchen_g_client_id') || DEFAULT_CLIENT_ID);
-    const [showSettings, setShowSettings] = createSignal(!localStorage.getItem('bear_kitchen_g_client_id'));
+    const [showSettings, setShowSettings] = createSignal(!localStorage.getItem('bear_kitchen_g_client_id') || !localStorage.getItem('bear_kitchen_gemini_key'));
     const [isReady, setIsReady] = createSignal(false);
 
     onMount(() => {
