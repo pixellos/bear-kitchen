@@ -1,0 +1,6 @@
+
+> orbital-hypernova@0.0.0 build
+> tsc -b && vite build
+
+src/components/SyncPanel.tsx(160,56): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/SyncPanel.tsx(161,53): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?

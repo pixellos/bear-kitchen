@@ -1,9 +1,90 @@
-import { type Component, createSignal } from 'solid-js';
-import { db } from '../db/db';
-import { Download, Upload, Cloud, RefreshCw, X } from 'lucide-solid';
+import { type Component, createSignal, onMount, Show } from 'solid-js';
+import { db, type Recipe } from '../db/db';
+import { Download, Upload, Cloud, RefreshCw, X, Edit2 } from 'lucide-solid';
+import { loadGoogleScripts, requestAccessToken, findOrCreateFolder, findFile, uploadFile, downloadFile } from '../utils/googleDrive';
 
 const SyncPanel: Component<{ onClose: () => void }> = (props) => {
     const [isSyncing, setIsSyncing] = createSignal(false);
+    const [status, setStatus] = createSignal('');
+    const [clientId, setClientId] = createSignal(localStorage.getItem('bear_kitchen_g_client_id') || '');
+    const [showSettings, setShowSettings] = createSignal(!localStorage.getItem('bear_kitchen_g_client_id'));
+    const [isReady, setIsReady] = createSignal(false);
+
+    onMount(() => {
+        if (clientId()) {
+            initializeGoogle(clientId());
+        }
+    });
+
+    const initializeGoogle = (id: string) => {
+        setStatus('Loading Google scripts... 🐾');
+        loadGoogleScripts(id, (err) => {
+            if (err) {
+                setStatus('Error loading Google API 🍯');
+                console.error(err);
+            } else {
+                setIsReady(true);
+                setStatus('Ready to connect! 🐻');
+            }
+        });
+    };
+
+    const saveSettings = () => {
+        if (clientId()) {
+            localStorage.setItem('bear_kitchen_g_client_id', clientId());
+            initializeGoogle(clientId());
+            setShowSettings(false);
+        }
+    };
+
+    const handleSync = async () => {
+        if (!isReady()) return;
+        setIsSyncing(true);
+        setStatus('Connecting to Google... 🚀');
+
+        try {
+            await requestAccessToken();
+
+            setStatus('Finding BearKitchen folder... 📂');
+            const folderId = await findOrCreateFolder();
+
+            setStatus('Checking for recipes... 📄');
+            const file = await findFile(folderId, 'recipes.json');
+
+            if (file) {
+                setStatus('Downloading remote recipes... ⬇️');
+                const content = await downloadFile(file.id!);
+                try {
+                    const remoteRecipes: Recipe[] = JSON.parse(content);
+                    // Merge logic: Add all remote recipes to local DB
+                    // Dexie will allow duplicates if IDs don't match, or update if they do.
+                    // For simplicity in this version, we act as a "restore/merge"
+                    await db.recipes.bulkPut(remoteRecipes);
+                    setStatus(`Merged ${remoteRecipes.length} remote recipes! 🥣`);
+                } catch (e) {
+                    console.error("Merge error", e);
+                    setStatus('Remote file was invalid json? 🤨');
+                }
+            }
+
+            setStatus('Uploading local library... ⬆️');
+            const localRecipes = await db.recipes.toArray();
+            await uploadFile(folderId, 'recipes.json', JSON.stringify(localRecipes, null, 2), file?.id);
+
+            setStatus('Sync Complete! 🎉');
+            setTimeout(() => setStatus(''), 5000);
+
+        } catch (e: any) {
+            console.error(e);
+            if (e?.error === 'popup_closed_by_user') {
+                setStatus('Login cancelled 😔');
+            } else {
+                setStatus('Sync failed 💥 Check console.');
+            }
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
     const exportData = async () => {
         const recipes = await db.recipes.toArray();
@@ -28,8 +109,6 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
             try {
                 const data = JSON.parse(ev.target?.result as string);
                 for (const recipe of data) {
-                    // Simplistic merge: add if title doesn't exist? 
-                    // Better: clear and replace if user wants, but merge is safer.
                     const { id, ...rest } = recipe;
                     await db.recipes.add(rest);
                 }
@@ -42,44 +121,85 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
         reader.readAsText(file);
     };
 
-    const simulateGoogleSync = () => {
-        setIsSyncing(true);
-        setTimeout(() => {
-            setIsSyncing(false);
-            alert('Google Sync simulation: Data would be sent to your Drive folder "Bear Kitchen". (Setup Client ID to enable real sync!) 🐻');
-        }, 2000);
-    };
-
     return (
         <div class="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-teddy-brown/20 backdrop-blur-sm" onClick={props.onClose}></div>
-            <div class="bear-card w-full max-w-md relative animate-in zoom-in-95 duration-200">
+            <div class="bear-card w-full max-w-md relative animate-in zoom-in-95 duration-200 display-flex flex-col max-h-[90vh]">
                 <button onClick={props.onClose} class="absolute right-4 top-4 text-teddy-light hover:text-teddy-brown">
                     <X size={24} />
                 </button>
 
-                <div class="text-center space-y-4">
+                <div class="text-center space-y-4 mb-6">
                     <div class="bg-honey/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto text-teddy-brown">
                         <Cloud size={40} />
                     </div>
                     <h3 class="text-2xl font-black text-teddy-brown">Cloud & Sync</h3>
-                    <p class="text-teddy-light text-sm">Keep your recipes safe across all your devices!</p>
+                    <p class="text-teddy-light text-sm">Keep your recipes safe!</p>
                 </div>
 
-                <div class="mt-8 space-y-3">
-                    <button
-                        onClick={simulateGoogleSync}
-                        class="w-full flex items-center justify-between p-4 bg-white border-2 border-honey rounded-2xl hover:bg-honey/5 transition-colors group"
-                    >
-                        <div class="flex items-center gap-3">
-                            <RefreshCw size={20} class={`text-teddy-brown ${isSyncing() ? 'animate-spin' : ''}`} />
-                            <div class="text-left">
-                                <p class="font-bold text-teddy-dark">Sync with Google</p>
-                                <p class="text-xs text-teddy-light">Auto-polling every 5 mins</p>
+                <div class="space-y-4 overflow-y-auto pr-2">
+                    {/* Google Sync Section */}
+                    <div class="bg-white border-2 border-honey rounded-2xl p-4 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h4 class="font-bold text-teddy-dark flex items-center gap-2">
+                                <RefreshCw size={18} /> Google Drive
+                            </h4>
+                            <button
+                                onClick={() => setShowSettings(!showSettings())}
+                                class="text-teddy-light hover:text-teddy-brown"
+                            >
+                                <Edit2 size={18} />
+                            </button>
+                        </div>
+
+                        <Show when={showSettings()}>
+                            <div class="bg-honey/10 p-3 rounded-xl space-y-2 text-sm">
+                                <p>To enable sync:</p>
+                                <ol class="list-decimal pl-4 space-y-1 text-xs text-teddy-dark/80">
+                                    <li>Go to Google Cloud Console</li>
+                                    <li>Create Project &gt; Enable "Google Drive API"</li>
+                                    <li>Credentials &gt; Create OAuth Client ID (Web App)</li>
+                                    <li>Add <code>{window.location.origin}</code> to Authorized Origins</li>
+                                    <li>Paste Client ID below:</li>
+                                </ol>
+                                <input
+                                    type="text"
+                                    placeholder="Client ID (e.g., 123...apps.googleusercontent.com)"
+                                    class="bear-input w-full text-xs"
+                                    value={clientId()}
+                                    onInput={(e) => setClientId(e.currentTarget.value)}
+                                />
+                                <button onClick={saveSettings} class="w-full bg-teddy-brown text-white rounded-lg py-1 text-xs font-bold">
+                                    Save & Connect
+                                </button>
+                            </div>
+                        </Show>
+
+                        <div class="flex flex-col gap-2">
+                            <button
+                                onClick={handleSync}
+                                disabled={!isReady() || isSyncing()}
+                                class="w-full bg-teddy-brown text-white font-bold py-3 rounded-xl hover:bg-teddy-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                <Show when={isSyncing()} fallback={<Cloud size={20} />}>
+                                    <RefreshCw size={20} class="animate-spin" />
+                                </Show>
+                                {isSyncing() ? 'Syncing...' : 'Sync Now'}
+                            </button>
+                            <div class="text-center h-4">
+                                <span class="text-xs font-bold text-teddy-light">{status()}</span>
                             </div>
                         </div>
-                        <div class="bg-honey/20 px-3 py-1 rounded-full text-[10px] font-black text-teddy-brown">CLOUD</div>
-                    </button>
+                    </div>
+
+                    <div class="relative py-2">
+                        <div class="absolute inset-0 flex items-center" aria-hidden="true">
+                            <div class="w-full border-t border-honey/30"></div>
+                        </div>
+                        <div class="relative flex justify-center">
+                            <span class="bg-white px-2 text-xs text-teddy-light">or backup manually</span>
+                        </div>
+                    </div>
 
                     <div class="grid grid-cols-2 gap-3">
                         <button
@@ -87,11 +207,11 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
                             class="flex flex-col items-center gap-2 p-4 bg-cream/50 border-2 border-honey/20 rounded-2xl hover:bg-cream transition-colors"
                         >
                             <Download size={24} class="text-teddy-brown" />
-                            <span class="text-xs font-bold text-teddy-brown">Backup</span>
+                            <span class="text-xs font-bold text-teddy-brown">Download JSON</span>
                         </button>
                         <label class="flex flex-col items-center gap-2 p-4 bg-cream/50 border-2 border-honey/20 rounded-2xl hover:bg-cream transition-colors cursor-pointer">
                             <Upload size={24} class="text-teddy-brown" />
-                            <span class="text-xs font-bold text-teddy-brown">Restore</span>
+                            <span class="text-xs font-bold text-teddy-brown">Restore JSON</span>
                             <input type="file" accept=".json" class="hidden" onChange={importData} />
                         </label>
                     </div>

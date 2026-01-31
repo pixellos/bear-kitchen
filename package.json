@@ -21,6 +21,9 @@
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
+    "@types/gapi": "^0.0.47",
+    "@types/gapi.client.drive": "^3.0.15",
+    "@types/google.accounts": "^0.0.18",
     "@types/node": "^24.10.1",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",
