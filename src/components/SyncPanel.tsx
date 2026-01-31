@@ -159,7 +159,7 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
                                     <p class="font-bold text-teddy-brown underline">Google Drive Sync</p>
                                     <ol class="list-decimal pl-4 space-y-1 text-xs text-teddy-dark/80">
                                         <li>Go to <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" class="text-teddy-brown font-bold underline hover:text-teddy-dark">Google Cloud Console</a></li>
-                                        <li>Create Project &gt; Enable "Google Drive API"</li>
+                                        <li>Enable <b>"Google Drive API"</b> AND <b>"Generative Language API"</b></li>
                                         <li>Credentials &gt; Create OAuth Client ID (Web App)</li>
                                         <li>Add <code>{window.location.origin}</code> to Authorized Origins</li>
                                         <li><b>Crucial:</b> Go to "OAuth consent screen" and add your email to "Test users"!</li>
@@ -174,11 +174,11 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
                                 </div>
 
                                 <div class="border-t border-honey/20 pt-3 space-y-2">
-                                    <p class="font-bold text-teddy-brown underline">Gemini AI Magic Scan</p>
-                                    <p class="text-[10px] text-teddy-light">Used to scan recipes from photos & auto-tag them. Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" class="underline">Google AI Studio</a>.</p>
+                                    <p class="font-bold text-teddy-brown underline">Gemini AI (Unified Login)</p>
+                                    <p class="text-[10px] text-teddy-light">AI Scan now uses your main Google login! No separate key needed if you enabled the API above. (Or paste a standalone key below as fallback)</p>
                                     <input
                                         type="password"
-                                        placeholder="Gemini API Key"
+                                        placeholder="Optional Standalone Gemini Key"
                                         class="bear-input w-full text-xs"
                                         value={localStorage.getItem('bear_kitchen_gemini_key') || ''}
                                         onInput={(e) => localStorage.setItem('bear_kitchen_gemini_key', e.currentTarget.value)}

@@ -5,6 +5,7 @@ import { Camera, Save, X, Plus, Hash, Image as ImageIcon, Sparkles, Loader2, Bra
 import { SolidMarkdown } from 'solid-markdown';
 import Tesseract from 'tesseract.js';
 import { scanRecipeWithAI } from '../utils/ai';
+import { getAccessToken, requestAccessToken } from '../utils/googleDrive';
 import clsx from 'clsx';
 
 const PREMADE_TAGS = ['meal', 'non-meal', 'breakfast', 'lunch', 'dinner', 'dessert', 'snack', 'veg'];
@@ -41,13 +42,34 @@ const Editor: Component = () => {
 
     const aiScan = async () => {
         const url = previewUrl();
-        const apiKey = localStorage.getItem('bear_kitchen_gemini_key');
-
         if (!url) return alert('Please add a photo first! 🧸');
-        if (!apiKey) return alert('Please set your Gemini API Key in the Cloud Sync panel first! 🔑');
 
         setIsAIScanning(true);
         try {
+            // 1. Try to get OAuth Token
+            let token = getAccessToken();
+            let isOAuth = !!token;
+
+            // if not logged in but we have a client ID, we could prompt for login
+            if (!token && localStorage.getItem('bear_kitchen_g_client_id')) {
+                const wantLogin = confirm("AI Scan works better with your Google Account! Sign in to use unified login? 🐻 (Or cancel to use API Key fallback)");
+                if (wantLogin) {
+                    await requestAccessToken();
+                    token = getAccessToken();
+                    isOAuth = !!token;
+                }
+            }
+
+            // 2. Fallback to API Key if still no token
+            if (!token) {
+                token = localStorage.getItem('bear_kitchen_gemini_key') || '';
+                isOAuth = false;
+            }
+
+            if (!token) {
+                throw new Error('Please sign in with Google or set a Gemini API Key in settings! 🔑');
+            }
+
             // We need to get the base64 of the image
             const response = await fetch(url);
             const blob = await response.blob();
@@ -58,7 +80,7 @@ const Editor: Component = () => {
             });
             const base64 = await base64Promise;
 
-            const result = await scanRecipeWithAI(apiKey, base64);
+            const result = await scanRecipeWithAI(token, base64, isOAuth);
 
             if (result.title) setTitle(result.title);
             if (result.content) setContent(result.content);
@@ -68,10 +90,10 @@ const Editor: Component = () => {
                 setTags(newTags);
             }
 
-            alert('AI Magic complete! ✨ The photo was split into recipe details, tags, and content. 🐾');
-        } catch (e) {
+            alert('AI Magic complete! ✨ Processed via ' + (isOAuth ? 'Unified Google Login' : 'API Key') + '. 🐾');
+        } catch (e: any) {
             console.error(e);
-            alert('AI Scan failed. Check your API Key and internet connection. 🐻');
+            alert(`AI Scan failed: ${e.message || e}`);
         } finally {
             setIsAIScanning(false);
         }

@@ -1,14 +1,12 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
 export interface AIRecipeResult {
     title: string;
     content: string;
     tags: string[];
 }
 
-export const scanRecipeWithAI = async (apiKey: string, base64Image: string): Promise<AIRecipeResult> => {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+export const scanRecipeWithAI = async (tokenOrKey: string, base64Image: string, isOAuth: boolean = false): Promise<AIRecipeResult> => {
+    // Remove data:image/...;base64, prefix if present
+    const base64Data = base64Image.split(',')[1] || base64Image;
 
     const prompt = `
     Extract the food recipe from this image. 
@@ -22,21 +20,48 @@ export const scanRecipeWithAI = async (apiKey: string, base64Image: string): Pro
     Only return the JSON object, no other text.
   `;
 
-    // Remove data:image/...;base64, prefix if present
-    const base64Data = base64Image.split(',')[1] || base64Image;
+    const payload = {
+        contents: [{
+            parts: [
+                { text: prompt },
+                {
+                    inlineData: {
+                        mimeType: "image/jpeg",
+                        data: base64Data
+                    }
+                }
+            ]
+        }]
+    };
 
-    const result = await model.generateContent([
-        prompt,
-        {
-            inlineData: {
-                data: base64Data,
-                mimeType: "image/jpeg",
-            },
-        },
-    ]);
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent${isOAuth ? '' : `?key=${tokenOrKey}`}`;
 
-    const response = await result.response;
-    const text = response.text();
+    const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+    };
+
+    if (isOAuth) {
+        headers['Authorization'] = `Bearer ${tokenOrKey}`;
+    }
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        const err = await response.json();
+        console.error("Gemini API Error:", err);
+        throw new Error(err.error?.message || "Gemini API request failed");
+    }
+
+    const result = await response.json();
+    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!text) {
+        throw new Error("No response from Gemini");
+    }
 
     // Try to parse JSON from the response (sometimes Gemini wraps it in ```json ... ```)
     const jsonMatch = text.match(/\{[\s\S]*\}/);
