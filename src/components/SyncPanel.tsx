@@ -124,8 +124,8 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
     return (
         <div class="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-teddy-brown/20 backdrop-blur-sm" onClick={props.onClose}></div>
-            <div class="bear-card w-full max-w-md relative animate-in zoom-in-95 duration-200 display-flex flex-col max-h-[90vh]">
-                <button onClick={props.onClose} class="absolute right-4 top-4 text-teddy-light hover:text-teddy-brown">
+            <div class="bear-card w-full max-w-md relative animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh] my-auto overflow-hidden">
+                <button onClick={props.onClose} class="absolute right-4 top-4 text-teddy-light hover:text-teddy-brown z-10">
                     <X size={24} />
                 </button>
 
