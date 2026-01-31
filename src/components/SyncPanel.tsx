@@ -6,7 +6,8 @@ import { loadGoogleScripts, requestAccessToken, findOrCreateFolder, findFile, up
 const SyncPanel: Component<{ onClose: () => void }> = (props) => {
     const [isSyncing, setIsSyncing] = createSignal(false);
     const [status, setStatus] = createSignal('');
-    const [clientId, setClientId] = createSignal(localStorage.getItem('bear_kitchen_g_client_id') || '');
+    const DEFAULT_CLIENT_ID = '924117517575-jm3a3911vbrusf356d11p6nag7paps0k.apps.googleusercontent.com';
+    const [clientId, setClientId] = createSignal(localStorage.getItem('bear_kitchen_g_client_id') || DEFAULT_CLIENT_ID);
     const [showSettings, setShowSettings] = createSignal(!localStorage.getItem('bear_kitchen_g_client_id'));
     const [isReady, setIsReady] = createSignal(false);
 
