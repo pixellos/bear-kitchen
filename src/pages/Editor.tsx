@@ -93,7 +93,7 @@ const Editor: Component = () => {
             alert('AI Magic complete! ✨ Processed via ' + (isOAuth ? 'Unified Google Login' : 'API Key') + '. 🐾');
         } catch (e: any) {
             console.error(e);
-            alert(`AI Scan failed: ${e.message || e}`);
+            alert(`AI Scan failed: ${e.message || e}\n\nTip: Did you enable the "Generative Language API" in Google Cloud Console?`);
         } finally {
             setIsAIScanning(false);
         }

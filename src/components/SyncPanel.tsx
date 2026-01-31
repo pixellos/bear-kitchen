@@ -159,7 +159,7 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
                                     <p class="font-bold text-teddy-brown underline">Google Drive Sync</p>
                                     <ol class="list-decimal pl-4 space-y-1 text-xs text-teddy-dark/80">
                                         <li>Go to <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" class="text-teddy-brown font-bold underline hover:text-teddy-dark">Google Cloud Console</a></li>
-                                        <li>Enable <b>"Google Drive API"</b> AND <b>"Generative Language API"</b></li>
+                                        <li>Enable <b>"Google Drive API"</b> AND <b>"Generative Language API"</b> (Search for "Generative Language"!)</li>
                                         <li>Credentials &gt; Create OAuth Client ID (Web App)</li>
                                         <li>Add <code>{window.location.origin}</code> to Authorized Origins</li>
                                         <li><b>Crucial:</b> Go to "OAuth consent screen" and add your email to "Test users"!</li>
