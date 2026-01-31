@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@solidjs/router": "^0.15.4",
     "@tailwindcss/vite": "^4.1.18",
     "clsx": "^2.1.1",

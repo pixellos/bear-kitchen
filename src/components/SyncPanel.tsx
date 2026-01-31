@@ -154,25 +154,39 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
                         </div>
 
                         <Show when={showSettings()}>
-                            <div class="bg-honey/10 p-3 rounded-xl space-y-2 text-sm">
-                                <p>To enable sync:</p>
-                                <ol class="list-decimal pl-4 space-y-1 text-xs text-teddy-dark/80">
-                                    <li>Go to <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" class="text-teddy-brown font-bold underline hover:text-teddy-dark">Google Cloud Console</a></li>
-                                    <li>Create Project &gt; Enable "Google Drive API"</li>
-                                    <li>Credentials &gt; Create OAuth Client ID (Web App)</li>
-                                    <li>Add <code>{window.location.origin}</code> to Authorized Origins</li>
-                                    <li><b>Crucial:</b> Go to "OAuth consent screen" and add your email to "Test users"!</li>
-                                    <li>Paste Client ID below:</li>
-                                </ol>
-                                <input
-                                    type="text"
-                                    placeholder="Client ID (e.g., 123...apps.googleusercontent.com)"
-                                    class="bear-input w-full text-xs"
-                                    value={clientId()}
-                                    onInput={(e) => setClientId(e.currentTarget.value)}
-                                />
-                                <button onClick={saveSettings} class="w-full bg-teddy-brown text-white rounded-lg py-1 text-xs font-bold">
-                                    Save & Connect
+                            <div class="bg-honey/10 p-3 rounded-xl space-y-4 text-sm mt-4">
+                                <div class="space-y-2">
+                                    <p class="font-bold text-teddy-brown underline">Google Drive Sync</p>
+                                    <ol class="list-decimal pl-4 space-y-1 text-xs text-teddy-dark/80">
+                                        <li>Go to <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" class="text-teddy-brown font-bold underline hover:text-teddy-dark">Google Cloud Console</a></li>
+                                        <li>Create Project &gt; Enable "Google Drive API"</li>
+                                        <li>Credentials &gt; Create OAuth Client ID (Web App)</li>
+                                        <li>Add <code>{window.location.origin}</code> to Authorized Origins</li>
+                                        <li><b>Crucial:</b> Go to "OAuth consent screen" and add your email to "Test users"!</li>
+                                    </ol>
+                                    <input
+                                        type="text"
+                                        placeholder="Google Client ID"
+                                        class="bear-input w-full text-xs"
+                                        value={clientId()}
+                                        onInput={(e) => setClientId(e.currentTarget.value)}
+                                    />
+                                </div>
+
+                                <div class="border-t border-honey/20 pt-3 space-y-2">
+                                    <p class="font-bold text-teddy-brown underline">Gemini AI Magic Scan</p>
+                                    <p class="text-[10px] text-teddy-light">Used to scan recipes from photos & auto-tag them. Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" class="underline">Google AI Studio</a>.</p>
+                                    <input
+                                        type="password"
+                                        placeholder="Gemini API Key"
+                                        class="bear-input w-full text-xs"
+                                        value={localStorage.getItem('bear_kitchen_gemini_key') || ''}
+                                        onInput={(e) => localStorage.setItem('bear_kitchen_gemini_key', e.currentTarget.value)}
+                                    />
+                                </div>
+
+                                <button onClick={saveSettings} class="w-full bg-teddy-brown text-white rounded-lg py-2 text-xs font-bold hover:bg-teddy-dark transition-colors">
+                                    Save Settings & Connect
                                 </button>
                             </div>
                         </Show>

@@ -1,10 +1,13 @@
 import { type Component, createSignal, For, onMount, Show } from 'solid-js';
 import { useNavigate, useParams } from '@solidjs/router';
 import { db, type Recipe } from '../db/db';
-import { Camera, Save, X, Plus, Hash, Image as ImageIcon, Sparkles, Loader2 } from 'lucide-solid';
+import { Camera, Save, X, Plus, Hash, Image as ImageIcon, Sparkles, Loader2, BrainCircuit } from 'lucide-solid';
 import { SolidMarkdown } from 'solid-markdown';
 import Tesseract from 'tesseract.js';
+import { scanRecipeWithAI } from '../utils/ai';
+import clsx from 'clsx';
 
+const PREMADE_TAGS = ['meal', 'non-meal', 'breakfast', 'lunch', 'dinner', 'dessert', 'snack', 'veg'];
 
 const Editor: Component = () => {
     const params = useParams();
@@ -19,6 +22,7 @@ const Editor: Component = () => {
     const [previewUrl, setPreviewUrl] = createSignal<string | null>(null);
     const [view, setView] = createSignal<'write' | 'preview'>('write');
     const [isScanning, setIsScanning] = createSignal(false);
+    const [isAIScanning, setIsAIScanning] = createSignal(false);
 
     onMount(async () => {
         if (isEdit) {
@@ -35,6 +39,44 @@ const Editor: Component = () => {
         }
     });
 
+    const aiScan = async () => {
+        const url = previewUrl();
+        const apiKey = localStorage.getItem('bear_kitchen_gemini_key');
+
+        if (!url) return alert('Please add a photo first! 🧸');
+        if (!apiKey) return alert('Please set your Gemini API Key in the Cloud Sync panel first! 🔑');
+
+        setIsAIScanning(true);
+        try {
+            // We need to get the base64 of the image
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const reader = new FileReader();
+            const base64Promise = new Promise<string>((resolve) => {
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.readAsDataURL(blob);
+            });
+            const base64 = await base64Promise;
+
+            const result = await scanRecipeWithAI(apiKey, base64);
+
+            if (result.title) setTitle(result.title);
+            if (result.content) setContent(result.content);
+            if (result.tags) {
+                // Merge tags and avoid duplicates
+                const newTags = Array.from(new Set([...tags(), ...result.tags]));
+                setTags(newTags);
+            }
+
+            alert('AI Magic complete! ✨ The photo was split into recipe details, tags, and content. 🐾');
+        } catch (e) {
+            console.error(e);
+            alert('AI Scan failed. Check your API Key and internet connection. 🐻');
+        } finally {
+            setIsAIScanning(false);
+        }
+    };
+
     const scanRecipe = async () => {
         const url = previewUrl();
         if (!url) return alert('Please add a photo first! 🧸');
@@ -47,7 +89,7 @@ const Editor: Component = () => {
 
             if (text.trim()) {
                 setContent(prev => prev + (prev ? '\n\n---\n\n' : '') + text.trim());
-                alert('Recipe scanned! Check the editor. 🐾');
+                alert('Tesseract scan complete! Check the editor. 🐾');
             } else {
                 alert('Could not find any clear text in the photo. 🍯');
             }
@@ -67,11 +109,11 @@ const Editor: Component = () => {
         }
     };
 
-    const addTag = () => {
-        const val = tagInput().trim().toLowerCase();
-        if (val && !tags().includes(val)) {
-            setTags([...tags(), val]);
-            setTagInput('');
+    const addTag = (val?: string) => {
+        const t = (val || tagInput()).trim().toLowerCase();
+        if (t && !tags().includes(t)) {
+            setTags([...tags(), t]);
+            if (!val) setTagInput('');
         }
     };
 
@@ -162,26 +204,15 @@ const Editor: Component = () => {
 
                 {/* Sidebar Controls */}
                 <div class="space-y-6">
-                    {/* Image Upload */}
+                    {/* Image Upload & AI Magic */}
                     <div class="bear-card">
                         <h4 class="font-bold flex items-center justify-between mb-4">
                             <div class="flex items-center gap-2">
                                 <ImageIcon size={18} class="text-teddy-brown" />
-                                Thumbnail
+                                Recipe Photo
                             </div>
-                            <Show when={previewUrl()}>
-                                <button
-                                    onClick={scanRecipe}
-                                    disabled={isScanning()}
-                                    class="text-xs flex items-center gap-1 bg-honey/20 text-teddy-brown px-3 py-1 rounded-full hover:bg-honey/40 transition-colors disabled:opacity-50"
-                                >
-                                    <Show when={isScanning()} fallback={<Sparkles size={14} />}>
-                                        <Loader2 size={14} class="animate-spin" />
-                                    </Show>
-                                    {isScanning() ? 'Reading...' : 'Scan Pic'}
-                                </button>
-                            </Show>
                         </h4>
+
                         <div
                             class="aspect-square rounded-2xl bg-honey/10 border-4 border-dashed border-honey flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer"
                             onClick={() => document.getElementById('image-upload')?.click()}
@@ -207,6 +238,28 @@ const Editor: Component = () => {
                                 onChange={handleImageChange}
                             />
                         </div>
+
+                        {/* Scan Buttons */}
+                        <div class="mt-4 grid grid-cols-1 gap-2">
+                            <button
+                                onClick={aiScan}
+                                disabled={isAIScanning() || !previewUrl()}
+                                class="w-full bg-teddy-brown text-white font-black py-3 rounded-xl hover:bg-teddy-dark transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
+                            >
+                                <Show when={isAIScanning()} fallback={<BrainCircuit size={18} />}>
+                                    <Loader2 size={18} class="animate-spin" />
+                                </Show>
+                                {isAIScanning() ? 'Gemini is Thinking...' : 'AI Magic Scan ✨'}
+                            </button>
+
+                            <button
+                                onClick={scanRecipe}
+                                disabled={isScanning() || !previewUrl()}
+                                class="w-full text-teddy-light hover:text-teddy-brown text-xs font-bold py-1 flex items-center justify-center gap-1 opacity-60 hover:opacity-100"
+                            >
+                                <Sparkles size={12} /> Simple OCR Scan
+                            </button>
+                        </div>
                     </div>
 
                     {/* Tags */}
@@ -215,6 +268,28 @@ const Editor: Component = () => {
                             <Hash size={18} class="text-teddy-brown" />
                             Tags
                         </h4>
+
+                        <div class="space-y-2 mb-4">
+                            <p class="text-[10px] font-black text-teddy-light/50 uppercase">Suggested Tags:</p>
+                            <div class="flex flex-wrap gap-1">
+                                <For each={PREMADE_TAGS}>
+                                    {(tag) => (
+                                        <button
+                                            onClick={() => addTag(tag)}
+                                            class={clsx(
+                                                "px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all border",
+                                                tags().includes(tag)
+                                                    ? "bg-honey text-teddy-brown border-honey"
+                                                    : "bg-white text-teddy-light border-honey/20 hover:border-honey/60"
+                                            )}
+                                        >
+                                            {tag}
+                                        </button>
+                                    )}
+                                </For>
+                            </div>
+                        </div>
+
                         <div class="flex flex-wrap gap-2 mb-3">
                             <For each={tags()}>
                                 {(tag) => (
@@ -230,14 +305,14 @@ const Editor: Component = () => {
                         <div class="flex gap-2">
                             <input
                                 type="text"
-                                placeholder="Ex: meat, dessert..."
-                                class="bear-input text-sm flex-1 !py-1.5"
+                                placeholder="Custom tag..."
+                                class="bear-input text-xs flex-1 !py-1.5"
                                 value={tagInput()}
                                 onInput={(e) => setTagInput(e.currentTarget.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && addTag()}
                             />
                             <button
-                                onClick={addTag}
+                                onClick={() => addTag()}
                                 class="bg-honey text-white p-2 rounded-xl hover:bg-teddy-light transition-colors"
                             >
                                 <Plus size={18} />
