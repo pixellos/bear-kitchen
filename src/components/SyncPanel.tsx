@@ -156,7 +156,7 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
                             <div class="bg-honey/10 p-3 rounded-xl space-y-2 text-sm">
                                 <p>To enable sync:</p>
                                 <ol class="list-decimal pl-4 space-y-1 text-xs text-teddy-dark/80">
-                                    <li>Go to Google Cloud Console</li>
+                                    <li>Go to <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" class="text-teddy-brown font-bold underline hover:text-teddy-dark">Google Cloud Console</a></li>
                                     <li>Create Project &gt; Enable "Google Drive API"</li>
                                     <li>Credentials &gt; Create OAuth Client ID (Web App)</li>
                                     <li>Add <code>{window.location.origin}</code> to Authorized Origins</li>
