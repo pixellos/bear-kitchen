@@ -39,12 +39,18 @@ const RecipeView: Component = () => {
                 </div>
 
                 <div class="relative rounded-[3rem] overflow-hidden bg-white shadow-2xl border-b-8 border-honey/20">
-                    <Show when={recipe()?.image}>
-                        <div class="h-[400px] w-full">
-                            <img
-                                src={typeof recipe()?.image === 'string' ? recipe()?.image as string : URL.createObjectURL(recipe()?.image as Blob)}
-                                class="w-full h-full object-cover"
-                            />
+                    <Show when={recipe()?.image && (Array.isArray(recipe()?.image) ? (recipe()?.image as any[]).length > 0 : true)}>
+                        <div class="flex overflow-x-auto snap-x no-scrollbar bg-honey/5 h-[400px]">
+                            <For each={Array.isArray(recipe()?.image) ? (recipe()?.image as (string | Blob)[]) : [recipe()?.image as (string | Blob)]}>
+                                {(img) => (
+                                    <div class="flex-shrink-0 w-full h-full snap-center">
+                                        <img
+                                            src={typeof img === 'string' ? img : URL.createObjectURL(img as Blob)}
+                                            class="w-full h-full object-cover"
+                                        />
+                                    </div>
+                                )}
+                            </For>
                         </div>
                     </Show>
 

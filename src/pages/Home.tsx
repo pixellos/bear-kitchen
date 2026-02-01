@@ -90,10 +90,13 @@ const Home: Component = () => {
                     {(recipe) => (
                         <A href={`/recipe/${recipe.id}`} class="group">
                             <article class="bear-card h-full flex flex-col gap-4 group-hover:scale-[1.02] transition-transform duration-300">
-                                {recipe.image && (
+                                {recipe.image && (Array.isArray(recipe.image) ? recipe.image.length > 0 : true) && (
                                     <div class="aspect-video rounded-2xl overflow-hidden -mx-2 -mt-2">
                                         <img
-                                            src={typeof recipe.image === 'string' ? recipe.image : URL.createObjectURL(recipe.image as Blob)}
+                                            src={(() => {
+                                                const img = Array.isArray(recipe.image) ? recipe.image[0] : recipe.image;
+                                                return typeof img === 'string' ? img : URL.createObjectURL(img as Blob);
+                                            })()}
                                             alt={recipe.title}
                                             class="w-full h-full object-cover"
                                         />
