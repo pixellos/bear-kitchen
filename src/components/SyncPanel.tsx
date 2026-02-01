@@ -90,17 +90,27 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
     const exportData = async () => {
         const recipes = await db.recipes.toArray();
 
-        // Convert Blob images to Base64 for portability
+        // Convert Blob images (single or array) to Base64 for portability
         const recipesWithBase64 = await Promise.all(recipes.map(async (r) => {
-            if (r.image instanceof Blob) {
-                const base64 = await new Promise<string>((resolve) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result as string);
-                    reader.readAsDataURL(r.image as Blob);
-                });
-                return { ...r, image: base64 };
+            const processImage = async (img: any): Promise<any> => {
+                if (img instanceof Blob) {
+                    return await new Promise<string>((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result as string);
+                        reader.readAsDataURL(img);
+                    });
+                }
+                return img;
+            };
+
+            let updatedImage = r.image;
+            if (Array.isArray(r.image)) {
+                updatedImage = await Promise.all(r.image.map(processImage));
+            } else {
+                updatedImage = await processImage(r.image);
             }
-            return r;
+
+            return { ...r, image: updatedImage };
         }));
 
         const data = JSON.stringify(recipesWithBase64, null, 2);

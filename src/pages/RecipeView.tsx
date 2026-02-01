@@ -3,6 +3,7 @@ import { useParams, useNavigate, A } from '@solidjs/router';
 import { db } from '../db/db';
 import { Edit2, Trash2, ArrowLeft, Clock, Tag } from 'lucide-solid';
 import ImageOverlay from '../components/ImageOverlay';
+import { getSafeImageUrl } from '../utils/imageUtils';
 // import { SolidMarkdown } from 'solid-markdown'; // Removed
 import { marked } from 'marked';
 
@@ -44,15 +45,20 @@ const RecipeView: Component = () => {
                     <Show when={recipe()?.image && (Array.isArray(recipe()?.image) ? (recipe()?.image as any[]).length > 0 : true)}>
                         <div class="flex overflow-x-auto snap-x no-scrollbar bg-honey/5 h-[400px]">
                             <For each={Array.isArray(recipe()?.image) ? (recipe()?.image as (string | Blob)[]) : [recipe()?.image as (string | Blob)]}>
-                                {(img) => (
-                                    <div class="flex-shrink-0 w-full h-full snap-center">
-                                        <img
-                                            src={typeof img === 'string' ? img : URL.createObjectURL(img as Blob)}
-                                            class="w-full h-full object-cover cursor-zoom-in hover:scale-105 transition-transform duration-500"
-                                            onClick={() => setFullscreenImg(typeof img === 'string' ? img : URL.createObjectURL(img as Blob))}
-                                        />
-                                    </div>
-                                )}
+                                {(img) => {
+                                    const url = getSafeImageUrl(img);
+                                    return (
+                                        <Show when={url}>
+                                            <div class="flex-shrink-0 w-full h-full snap-center">
+                                                <img
+                                                    src={url!}
+                                                    class="w-full h-full object-cover cursor-zoom-in hover:scale-105 transition-transform duration-500"
+                                                    onClick={() => setFullscreenImg(url!)}
+                                                />
+                                            </div>
+                                        </Show>
+                                    );
+                                }}
                             </For>
                         </div>
                     </Show>

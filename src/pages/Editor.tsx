@@ -10,6 +10,7 @@ import { cleanRecipeTextFree } from '../utils/ai';
 import clsx from 'clsx';
 import toast from 'solid-toast';
 import TurndownService from 'turndown';
+import { getSafeImageUrl } from '../utils/imageUtils';
 
 const PREMADE_TAGS = ['meal', 'non-meal', 'breakfast', 'lunch', 'dinner', 'dessert', 'snack', 'veg'];
 
@@ -52,7 +53,7 @@ const Editor: Component = () => {
                 if (recipe.image) {
                     const imgs = Array.isArray(recipe.image) ? recipe.image : [recipe.image];
                     setImages(imgs);
-                    setPreviewUrls(imgs.map(img => typeof img === 'string' ? img : URL.createObjectURL(img as Blob)));
+                    setPreviewUrls(imgs.map(img => getSafeImageUrl(img)).filter((url): url is string => !!url));
                 }
             }
         }
@@ -145,7 +146,7 @@ const Editor: Component = () => {
         const files = (e.target as HTMLInputElement).files;
         if (files && files.length > 0) {
             const newFiles = Array.from(files);
-            const newUrls = newFiles.map(file => URL.createObjectURL(file));
+            const newUrls = newFiles.map(file => getSafeImageUrl(file)).filter((url): url is string => !!url);
 
             setImages(prev => [...prev, ...newFiles]);
             setPreviewUrls(prev => [...prev, ...newUrls]);
@@ -154,6 +155,10 @@ const Editor: Component = () => {
     };
 
     const removeImage = (index: number) => {
+        const urlToRevoke = previewUrls()[index];
+        if (urlToRevoke && urlToRevoke.startsWith('blob:')) {
+            URL.revokeObjectURL(urlToRevoke);
+        }
         setPreviewUrls(prev => prev.filter((_, i) => i !== index));
         setImages(prev => prev.filter((_, i) => i !== index));
     };

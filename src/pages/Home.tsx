@@ -4,6 +4,7 @@ import { Search, Utensils, Plus, Tag } from 'lucide-solid';
 import { A } from '@solidjs/router';
 import clsx from 'clsx';
 import ImageOverlay from '../components/ImageOverlay';
+import { getFirstImageUrl } from '../utils/imageUtils';
 
 const PREMADE_TAGS = ['meal', 'non-meal', 'breakfast', 'lunch', 'dinner', 'dessert', 'snack', 'veg'];
 
@@ -109,20 +110,17 @@ const Home: Component = () => {
                         {(recipe) => (
                             <A href={`/recipe/${recipe.id}`} class="group">
                                 <article class="bear-card h-full flex flex-col gap-4 group-hover:scale-[1.02] transition-transform duration-300">
-                                    {recipe.image && (Array.isArray(recipe.image) ? recipe.image.length > 0 : true) && (
+                                    {getFirstImageUrl(recipe.image) && (
                                         <div class="aspect-video rounded-2xl overflow-hidden -mx-2 -mt-2 group/img relative">
                                             <img
-                                                src={(() => {
-                                                    const img = Array.isArray(recipe.image) ? recipe.image[0] : recipe.image;
-                                                    return typeof img === 'string' ? img : URL.createObjectURL(img as Blob);
-                                                })()}
+                                                src={getFirstImageUrl(recipe.image)!}
                                                 alt={recipe.title}
                                                 class="w-full h-full object-cover cursor-zoom-in hover:scale-110 transition-transform duration-500"
                                                 onClick={(e) => {
                                                     e.preventDefault();
                                                     e.stopPropagation();
-                                                    const img = Array.isArray(recipe.image) ? recipe.image[0] : recipe.image;
-                                                    setFullscreenImg(typeof img === 'string' ? img : URL.createObjectURL(img as Blob));
+                                                    const url = getFirstImageUrl(recipe.image);
+                                                    if (url) setFullscreenImg(url);
                                                 }}
                                             />
                                         </div>
