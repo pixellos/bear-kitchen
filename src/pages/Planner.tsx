@@ -1,9 +1,12 @@
 import { type Component, createSignal, onMount, For, Show } from 'solid-js';
 import { db, type Recipe, type WeekPlan } from '../db/db';
-import { ChevronLeft, ChevronRight, Plus, Trash2, Calendar, Utensils, X } from 'lucide-solid';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Calendar, Utensils, X, ShoppingCart, Loader2 } from 'lucide-solid';
 import { A } from '@solidjs/router';
 import clsx from 'clsx';
 import toast from 'solid-toast';
+import { getFirstImageUrl } from '../utils/imageUtils';
+import { generateShoppingList } from '../utils/ai';
+import ShoppingListModal from '../components/ShoppingListModal';
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
 
@@ -13,6 +16,8 @@ const Planner: Component = () => {
     const [allRecipes, setAllRecipes] = createSignal<Recipe[]>([]);
     const [isAddModalOpen, setIsAddModalOpen] = createSignal(false);
     const [selectedDay, setSelectedDay] = createSignal<typeof DAYS[number] | null>(null);
+    const [shoppingListContent, setShoppingListContent] = createSignal<string | null>(null);
+    const [isGeneratingList, setIsGeneratingList] = createSignal(false);
 
     // Helpers
     function getMonday(d: Date) {
@@ -110,6 +115,28 @@ const Planner: Component = () => {
         }
     };
 
+    const handleGenerateList = async () => {
+        const currentPlan = plan();
+        if (!currentPlan) return;
+
+        const recipeIds = Object.values(currentPlan.days).flat();
+        if (recipeIds.length === 0) {
+            toast.error('Add some recipes to your week first! 🍯');
+            return;
+        }
+
+        setIsGeneratingList(true);
+        try {
+            const recipes = recipeIds.map(id => getRecipe(id)).filter((r): r is Recipe => !!r);
+            const list = await generateShoppingList(recipes);
+            setShoppingListContent(list);
+        } catch (e) {
+            toast.error('Failed to generate list. 🐻');
+        } finally {
+            setIsGeneratingList(false);
+        }
+    };
+
     const getRecipe = (id: number) => allRecipes().find(r => r.id === id);
 
     return (
@@ -121,23 +148,36 @@ const Planner: Component = () => {
                         <Calendar size={24} />
                     </div>
                     <div>
-                        <h2 class="text-2xl font-black text-teddy-brown">Weekly Planner</h2>
+                        <h2 class="text-2xl font-black text-teddy-brown">Week Template Manager</h2>
                         <p class="text-teddy-light font-bold">
                             {formatDate(weekStart())} - {formatDate(getDayDate(6))}
                         </p>
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2 bg-honey/10 p-1 rounded-full">
-                    <button onClick={() => changeWeek(-1)} class="p-2 hover:bg-white rounded-full transition-colors text-teddy-brown">
-                        <ChevronLeft size={20} />
+                <div class="flex flex-wrap items-center gap-4">
+                    <button
+                        onClick={handleGenerateList}
+                        disabled={isGeneratingList()}
+                        class="bg-teddy-brown text-white px-6 py-2 rounded-full font-black flex items-center gap-2 hover:bg-teddy-dark transition-all disabled:opacity-50 shadow-md"
+                    >
+                        <Show when={isGeneratingList()} fallback={<ShoppingCart size={18} />}>
+                            <Loader2 size={18} class="animate-spin" />
+                        </Show>
+                        {isGeneratingList() ? 'Generating...' : 'Magic Shopping List ✨'}
                     </button>
-                    <button onClick={() => setWeekStart(getMonday(new Date()))} class="px-4 py-1 text-xs font-bold text-teddy-brown hover:bg-white rounded-full transition-colors">
-                        Today
-                    </button>
-                    <button onClick={() => changeWeek(1)} class="p-2 hover:bg-white rounded-full transition-colors text-teddy-brown">
-                        <ChevronRight size={20} />
-                    </button>
+
+                    <div class="flex items-center gap-2 bg-honey/10 p-1 rounded-full">
+                        <button onClick={() => changeWeek(-1)} class="p-2 hover:bg-white rounded-full transition-colors text-teddy-brown">
+                            <ChevronLeft size={20} />
+                        </button>
+                        <button onClick={() => setWeekStart(getMonday(new Date()))} class="px-4 py-1 text-xs font-bold text-teddy-brown hover:bg-white rounded-full transition-colors">
+                            Today
+                        </button>
+                        <button onClick={() => changeWeek(1)} class="p-2 hover:bg-white rounded-full transition-colors text-teddy-brown">
+                            <ChevronRight size={20} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -167,21 +207,28 @@ const Planner: Component = () => {
                                     {(recipeId) => {
                                         const r = getRecipe(recipeId);
                                         return (
-                                            <div class="bg-white p-3 rounded-xl shadow-sm border border-honey/10 group relative hover:shadow-md transition-shadow">
+                                            <div class="bg-white p-2 rounded-xl shadow-sm border border-honey/10 group relative hover:shadow-md transition-shadow flex gap-2">
                                                 <Show when={r}>
-                                                    <div class="text-sm font-bold text-teddy-brown line-clamp-2 mb-1">
-                                                        {r?.title}
-                                                    </div>
-                                                    <div class="flex gap-1 flex-wrap">
-                                                        <For each={r?.tags.slice(0, 2)}>
-                                                            {t => <span class="text-[9px] bg-honey/10 px-1.5 py-0.5 rounded text-teddy-light font-bold">{t}</span>}
-                                                        </For>
+                                                    {getFirstImageUrl(r?.image) && (
+                                                        <div class="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0">
+                                                            <img src={getFirstImageUrl(r?.image)} class="w-full h-full object-cover" />
+                                                        </div>
+                                                    )}
+                                                    <div class="flex-1 min-w-0">
+                                                        <div class="text-[11px] font-bold text-teddy-brown line-clamp-2 leading-tight mb-1">
+                                                            {r?.title}
+                                                        </div>
+                                                        <div class="flex gap-1 flex-wrap">
+                                                            <For each={r?.tags.slice(0, 1)}>
+                                                                {t => <span class="text-[8px] bg-honey/10 px-1 py-0.5 rounded text-teddy-light font-bold">{t}</span>}
+                                                            </For>
+                                                        </div>
                                                     </div>
                                                     <button
                                                         onClick={() => removeFromPlan(day, recipeId)}
-                                                        class="absolute -top-1 -right-1 bg-red-100 text-red-500 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        class="absolute -top-1 -right-1 bg-red-100 text-red-500 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10"
                                                     >
-                                                        <Trash2 size={12} />
+                                                        <Trash2 size={10} />
                                                     </button>
                                                 </Show>
                                             </div>
@@ -234,6 +281,11 @@ const Planner: Component = () => {
                     </div>
                 </div>
             </Show>
+
+            <ShoppingListModal
+                content={shoppingListContent()}
+                onClose={() => setShoppingListContent(null)}
+            />
         </div>
     );
 };
