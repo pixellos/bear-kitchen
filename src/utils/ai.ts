@@ -4,7 +4,7 @@ export interface AIRecipeResult {
     tags: string[];
 }
 
-export const scanRecipeWithAI = async (tokenOrKey: string, base64Image: string, isOAuth: boolean = false): Promise<AIRecipeResult> => {
+export const scanRecipeWithAI = async (apiKey: string, base64Image: string): Promise<AIRecipeResult> => {
     // Remove data:image/...;base64, prefix if present
     const base64Data = base64Image.split(',')[1] || base64Image;
 
@@ -34,19 +34,13 @@ export const scanRecipeWithAI = async (tokenOrKey: string, base64Image: string, 
         }]
     };
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent${isOAuth ? '' : `?key=${tokenOrKey}`}`;
-
-    const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-    };
-
-    if (isOAuth) {
-        headers['Authorization'] = `Bearer ${tokenOrKey}`;
-    }
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
         method: 'POST',
-        headers: headers,
+        headers: {
+            'Content-Type': 'application/json',
+        },
         body: JSON.stringify(payload)
     });
 
@@ -56,7 +50,51 @@ export const scanRecipeWithAI = async (tokenOrKey: string, base64Image: string, 
         throw new Error(err.error?.message || "Gemini API request failed");
     }
 
-    const result = await response.json();
+    return parseGeminiResponse(await response.json());
+};
+
+export const cleanRecipeText = async (apiKey: string, rawText: string): Promise<AIRecipeResult> => {
+    const prompt = `
+    Analyze the following raw OCR text and extract a food recipe from it.
+    Return the result strictly as a JSON object with the following structure:
+    {
+      "title": "Recipe Name",
+      "content": "Recipe content in clean Markdown format including ingredients and steps",
+      "tags": ["tag1", "tag2"]
+    }
+    Use common tags like: breakfast, lunch, dinner, meal, dessert, snack, meat, veg.
+    Only return the JSON object, no other text.
+
+    RAW TEXT:
+    ${rawText}
+    `;
+
+    const payload = {
+        contents: [{
+            parts: [{ text: prompt }]
+        }]
+    };
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        const err = await response.json();
+        console.error("Gemini Text API Error:", err);
+        throw new Error(err.error?.message || "Gemini API request failed");
+    }
+
+    return parseGeminiResponse(await response.json());
+};
+
+const parseGeminiResponse = (result: any): AIRecipeResult => {
     const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!text) {

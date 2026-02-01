@@ -35,7 +35,10 @@ const Home: Component = () => {
     return (
         <div class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div class="text-center space-y-2">
-                <h2 class="text-4xl font-black text-teddy-brown">My Secret Cookbook 🍯</h2>
+                <h2 class="text-4xl font-black text-teddy-brown flex items-center justify-center gap-3">
+                    <span class="text-5xl animate-bounce">🐻</span>
+                    <span>My Cozy Recipes</span>
+                </h2>
                 <p class="text-teddy-light italic">"A balanced diet is a cookie in each hand!"</p>
             </div>
 

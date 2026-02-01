@@ -2,7 +2,7 @@
 /// <reference types="gapi.client.drive" />
 /// <reference types="google.accounts" />
 
-export const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/generative-language';
+export const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 export const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
 
 let tokenClient: google.accounts.oauth2.TokenClient | null = null;

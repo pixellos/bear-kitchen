@@ -4,16 +4,19 @@ import { db, type Recipe } from '../db/db';
 import { Camera, Save, X, Plus, Hash, Image as ImageIcon, Sparkles, Loader2, BrainCircuit } from 'lucide-solid';
 import { SolidMarkdown } from 'solid-markdown';
 import Tesseract from 'tesseract.js';
-import { scanRecipeWithAI } from '../utils/ai';
-import { getAccessToken, requestAccessToken } from '../utils/googleDrive';
+import { scanRecipeWithAI, cleanRecipeText } from '../utils/ai';
 import clsx from 'clsx';
+import toast from 'solid-toast';
+import TurndownService from 'turndown';
 
 const PREMADE_TAGS = ['meal', 'non-meal', 'breakfast', 'lunch', 'dinner', 'dessert', 'snack', 'veg'];
+const DEFAULT_GEMINI_KEY = 'AIzaSyCy_w3atWUEd9ZBrZBVm-Qg64INXVUcMrA';
 
 const Editor: Component = () => {
     const params = useParams();
     const navigate = useNavigate();
     const isEdit = !!params.id;
+    const turndownService = new TurndownService();
 
     const [title, setTitle] = createSignal('');
     const [content, setContent] = createSignal('');
@@ -42,35 +45,13 @@ const Editor: Component = () => {
 
     const aiScan = async () => {
         const url = previewUrl();
-        if (!url) return alert('Please add a photo first! 🧸');
+        if (!url) return toast.error('Please add a photo first! 🧸');
 
         setIsAIScanning(true);
         try {
-            // 1. Try to get OAuth Token
-            let token = getAccessToken();
-            let isOAuth = !!token;
+            const apiKey = localStorage.getItem('bear_kitchen_gemini_key') || DEFAULT_GEMINI_KEY;
 
-            // if not logged in but we have a client ID, we could prompt for login
-            if (!token && localStorage.getItem('bear_kitchen_g_client_id')) {
-                const wantLogin = confirm("AI Scan works better with your Google Account! Sign in to use unified login? 🐻 (Or cancel to use API Key fallback)");
-                if (wantLogin) {
-                    await requestAccessToken();
-                    token = getAccessToken();
-                    isOAuth = !!token;
-                }
-            }
-
-            // 2. Fallback to API Key if still no token
-            if (!token) {
-                token = localStorage.getItem('bear_kitchen_gemini_key') || '';
-                isOAuth = false;
-            }
-
-            if (!token) {
-                throw new Error('Please sign in with Google or set a Gemini API Key in settings! 🔑');
-            }
-
-            // We need to get the base64 of the image
+            // Get base64
             const response = await fetch(url);
             const blob = await response.blob();
             const reader = new FileReader();
@@ -80,20 +61,20 @@ const Editor: Component = () => {
             });
             const base64 = await base64Promise;
 
-            const result = await scanRecipeWithAI(token, base64, isOAuth);
+            // Simple "Magic" Scan (Image -> Recipe)
+            const result = await scanRecipeWithAI(apiKey, base64);
 
             if (result.title) setTitle(result.title);
             if (result.content) setContent(result.content);
             if (result.tags) {
-                // Merge tags and avoid duplicates
                 const newTags = Array.from(new Set([...tags(), ...result.tags]));
                 setTags(newTags);
             }
 
-            alert('AI Magic complete! ✨ Processed via ' + (isOAuth ? 'Unified Google Login' : 'API Key') + '. 🐾');
+            toast.success('AI Magic complete! ✨');
         } catch (e: any) {
             console.error(e);
-            alert(`AI Scan failed: ${e.message || e}\n\nTip: Did you enable the "Generative Language API" in Google Cloud Console?`);
+            toast.error(`AI Scan failed: ${e.message || e}`);
         } finally {
             setIsAIScanning(false);
         }
@@ -101,7 +82,7 @@ const Editor: Component = () => {
 
     const scanRecipe = async () => {
         const url = previewUrl();
-        if (!url) return alert('Please add a photo first! 🧸');
+        if (!url) return toast.error('Please add a photo first! 🧸');
 
         setIsScanning(true);
         try {
@@ -110,14 +91,28 @@ const Editor: Component = () => {
             });
 
             if (text.trim()) {
-                setContent(prev => prev + (prev ? '\n\n---\n\n' : '') + text.trim());
-                alert('Tesseract scan complete! Check the editor. 🐾');
+                const apiKey = localStorage.getItem('bear_kitchen_gemini_key') || DEFAULT_GEMINI_KEY;
+
+                // Advanced Flow: Tesseract -> Clean with Gemini Text Mode
+                if (confirm('OCR Complete! Do you want AI to format and clean this text? 🧠✨')) {
+                    const result = await cleanRecipeText(apiKey, text);
+                    if (result.title) setTitle(result.title);
+                    if (result.content) setContent(result.content);
+                    if (result.tags) {
+                        const newTags = Array.from(new Set([...tags(), ...result.tags]));
+                        setTags(newTags);
+                    }
+                    toast.success('Text cleaned and formatted! 🧼');
+                } else {
+                    setContent(prev => prev + (prev ? '\n\n---\n\n' : '') + text.trim());
+                    toast.success('Raw text added! 📝');
+                }
             } else {
-                alert('Could not find any clear text in the photo. 🍯');
+                toast.error('Could not find any clear text in the photo. 🍯');
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            alert('Scanning failed. 🐻');
+            toast.error(`Scanning failed: ${e.message || e}`);
         } finally {
             setIsScanning(false);
         }
@@ -144,7 +139,7 @@ const Editor: Component = () => {
     };
 
     const saveRecipe = async () => {
-        if (!title().trim()) return alert('Please enter a title');
+        if (!title().trim()) return toast.error('Please enter a title');
 
         const recipeData: Partial<Recipe> = {
             title: title(),
@@ -162,36 +157,58 @@ const Editor: Component = () => {
                 createdAt: Date.now(),
             } as Recipe);
         }
+        toast.success('Recipe saved! 🍲');
         navigate('/');
     };
 
+    // Paste handler for rich text
+    const handlePaste = (e: ClipboardEvent) => {
+        const html = e.clipboardData?.getData('text/html');
+        if (html) {
+            e.preventDefault();
+            const markdown = turndownService.turndown(html);
+            // Simple append logic
+            const textarea = e.target as HTMLTextAreaElement;
+            if (textarea.tagName === 'TEXTAREA') {
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const old = content();
+                const newVal = old.substring(0, start) + markdown + old.substring(end);
+                setContent(newVal);
+            } else {
+                setContent(prev => prev + markdown);
+            }
+            toast.success('Converted rich text to Markdown! 📋');
+        }
+    };
+
     return (
-        <div class="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <header class="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-honey/30">
-                <h2 class="text-2xl font-black text-teddy-brown">{isEdit ? 'Edit Recipe' : 'New Recipe'}</h2>
-                <div class="flex gap-2">
-                    <button onClick={() => navigate('/')} class="p-2 text-teddy-light hover:bg-honey/10 rounded-full transition-colors">
-                        <X size={24} />
-                    </button>
-                    <button onClick={saveRecipe} class="bear-button flex items-center gap-2">
-                        <Save size={20} />
-                        <span>Save</span>
-                    </button>
-                </div>
-            </header>
+        <div class="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24 relative">
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Main Editor Section */}
                 <div class="md:col-span-2 space-y-4">
-                    <input
-                        type="text"
-                        placeholder="Cool Recipe Title..."
-                        class="bear-input w-full text-3xl font-black py-4"
-                        value={title()}
-                        onInput={(e) => setTitle(e.currentTarget.value)}
-                    />
+                    {/* Sticky Bottom Bar (Replaces Top Header and Floating Input) */}
+                    <div class="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-honey/50 z-50 flex items-center justify-between shadow-lg animate-in slide-in-from-bottom-full duration-500">
+                        <div class="flex-1 max-w-2xl mx-auto flex gap-4 items-center">
+                            <button onClick={() => navigate('/')} class="p-2 text-teddy-light hover:bg-honey/10 rounded-full transition-colors flex-shrink-0">
+                                <X size={24} />
+                            </button>
+                            <input
+                                type="text"
+                                placeholder="Recipe Title..."
+                                class="bear-input flex-1 text-xl font-black !py-2 !px-4 shadow-sm"
+                                value={title()}
+                                onInput={(e) => setTitle(e.currentTarget.value)}
+                            />
+                            <button onClick={saveRecipe} class="bear-button flex items-center gap-2 flex-shrink-0 shadow-lg hover:scale-105 transition-transform">
+                                <Save size={20} />
+                                <span class="hidden sm:inline">Save</span>
+                            </button>
+                        </div>
+                    </div>
 
-                    <div class="bear-card !p-0 overflow-hidden flex flex-col h-[500px]">
+                    <div class="bear-card !p-0 overflow-hidden flex flex-col h-[70vh]">
                         <div class="bg-honey/10 flex border-b-2 border-honey/20">
                             <button
                                 class={`px-6 py-3 font-bold transition-colors ${view() === 'write' ? 'bg-white text-teddy-brown' : 'text-honey hover:text-teddy-light'}`}
@@ -218,6 +235,7 @@ const Editor: Component = () => {
                                     placeholder="Tell us everything! (Markdown supported)"
                                     value={content()}
                                     onInput={(e) => setContent(e.currentTarget.value)}
+                                    onPaste={handlePaste}
                                 ></textarea>
                             </Show>
                         </div>
@@ -279,7 +297,7 @@ const Editor: Component = () => {
                                 disabled={isScanning() || !previewUrl()}
                                 class="w-full text-teddy-light hover:text-teddy-brown text-xs font-bold py-1 flex items-center justify-center gap-1 opacity-60 hover:opacity-100"
                             >
-                                <Sparkles size={12} /> Simple OCR Scan
+                                <Sparkles size={12} /> Simple OCR Scan (with Tesseract)
                             </button>
                         </div>
                     </div>

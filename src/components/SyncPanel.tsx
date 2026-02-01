@@ -92,7 +92,21 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
 
     const exportData = async () => {
         const recipes = await db.recipes.toArray();
-        const data = JSON.stringify(recipes, null, 2);
+
+        // Convert Blob images to Base64 for portability
+        const recipesWithBase64 = await Promise.all(recipes.map(async (r) => {
+            if (r.image instanceof Blob) {
+                const base64 = await new Promise<string>((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.readAsDataURL(r.image as Blob);
+                });
+                return { ...r, image: base64 };
+            }
+            return r;
+        }));
+
+        const data = JSON.stringify(recipesWithBase64, null, 2);
         const blob = new Blob([data], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -162,7 +176,7 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
                                     <p class="font-bold text-teddy-brown underline">Google Drive Sync</p>
                                     <ol class="list-decimal pl-4 space-y-1 text-xs text-teddy-dark/80">
                                         <li>Go to <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" class="text-teddy-brown font-bold underline hover:text-teddy-dark">Google Cloud Console</a></li>
-                                        <li>Enable <b>"Google Drive API"</b> AND <b>"Generative Language API"</b> (Search for "Generative Language"!)</li>
+                                        <li>Enable <b>"Google Drive API"</b></li>
                                         <li>Credentials &gt; Create OAuth Client ID (Web App)</li>
                                         <li>Add <code>{window.location.origin}</code> to Authorized Origins</li>
                                         <li><b>Crucial:</b> Go to "OAuth consent screen" and add your email to "Test users"!</li>
@@ -177,15 +191,16 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
                                 </div>
 
                                 <div class="border-t border-honey/20 pt-3 space-y-2">
-                                    <p class="font-bold text-teddy-brown underline">Gemini AI (Unified Login)</p>
-                                    <p class="text-[10px] text-teddy-light">AI Scan now uses your main Google login! No separate key needed if you enabled the API above. (Or paste a standalone key below as fallback)</p>
+                                    <p class="font-bold text-teddy-brown underline">Gemini AI Key</p>
+                                    <p class="text-[10px] text-teddy-light">Required for AI Magic. A default key is provided, but you can use your own free one from <a href="https://aistudio.google.com/" target="_blank" class="underline hover:text-teddy-brown">Google AI Studio</a>.</p>
                                     <input
                                         type="password"
-                                        placeholder="Optional Standalone Gemini Key"
+                                        placeholder="Gemini API Key (Leave empty to use default)"
                                         class="bear-input w-full text-xs"
-                                        value={apiKey()}
-                                        onInput={(e) => setApiKey(e.currentTarget.value)}
+                                        value={apiKey() === DEFAULT_GEMINI_KEY ? '' : apiKey()}
+                                        onInput={(e) => setApiKey(e.currentTarget.value || DEFAULT_GEMINI_KEY)}
                                     />
+                                    <p class="text-[10px] text-teddy-light/70">{apiKey() === DEFAULT_GEMINI_KEY ? 'Using Default Key 🔑' : 'Using Custom Key ✨'}</p>
                                 </div>
 
                                 <button onClick={saveSettings} class="w-full bg-teddy-brown text-white rounded-lg py-2 text-xs font-bold hover:bg-teddy-dark transition-colors">
