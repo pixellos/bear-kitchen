@@ -2,7 +2,8 @@ import { type Component, createResource, For, Show } from 'solid-js';
 import { useParams, useNavigate, A } from '@solidjs/router';
 import { db } from '../db/db';
 import { Edit2, Trash2, ArrowLeft, Clock, Tag } from 'lucide-solid';
-import { SolidMarkdown } from 'solid-markdown';
+// import { SolidMarkdown } from 'solid-markdown'; // Removed
+import { marked } from 'marked';
 
 const RecipeView: Component = () => {
     const params = useParams();
@@ -70,9 +71,10 @@ const RecipeView: Component = () => {
                 </div>
 
                 <div class="bear-card !p-12 !rounded-[3rem]">
-                    <article class="prose prose-lg prose-teddy max-w-none prose-img:rounded-3xl prose-headings:text-teddy-brown prose-headings:font-black">
-                        <SolidMarkdown children={recipe()?.content || ''} />
-                    </article>
+                    <article
+                        class="prose prose-lg prose-teddy max-w-none prose-img:rounded-3xl prose-headings:text-teddy-brown prose-headings:font-black"
+                        innerHTML={marked.parse(recipe()?.content || '') as string}
+                    />
                 </div>
             </div>
         </Show>

@@ -94,6 +94,58 @@ export const cleanRecipeText = async (apiKey: string, rawText: string): Promise<
     return parseGeminiResponse(await response.json());
 };
 
+export const cleanRecipeTextFree = async (rawText: string): Promise<AIRecipeResult> => {
+    const prompt = `
+    Analyze the following raw OCR text and extract a food recipe from it.
+    Return the result strictly as a JSON object with the following structure:
+    {
+      "title": "Recipe Name",
+      "content": "Recipe content in clean Markdown format including ingredients and steps",
+      "tags": ["tag1", "tag2"]
+    }
+    Use common tags like: breakfast, lunch, dinner, meal, dessert, snack, meat, veg.
+    Only return the JSON object, no other text.
+
+    RAW TEXT:
+    ${rawText}
+    `;
+
+    // Pollinations.ai Text API
+    // Using a reliable model if possible, or default.
+    const url = 'https://text.pollinations.ai/';
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            messages: [{ role: 'user', content: prompt }],
+            model: 'openai', // or 'mistral' or 'gpt-4o' if available freely
+            jsonMode: true // Hint to return JSON if supported
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error(`Pollinations API failed: ${response.statusText}`);
+    }
+
+    const text = await response.text();
+
+    // Parse the text which should be the assistant's reply
+    // It might be raw JSON or wrapped.
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+        // Fallback: create a basic object if parsing fails
+        console.warn("Could not parse Free AI response as JSON", text);
+        return {
+            title: "Scanned Recipe",
+            content: rawText, // Fallback to raw text
+            tags: ["ocr"]
+        };
+    }
+
+    return JSON.parse(jsonMatch[0]) as AIRecipeResult;
+};
+
 const parseGeminiResponse = (result: any): AIRecipeResult => {
     const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
 

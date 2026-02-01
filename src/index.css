@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   --color-teddy-brown: #8D5524;
@@ -40,7 +41,10 @@
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+/* Restore prose-teddy using the plugin's variables if necessary, but starting fresh is safer. */
+/* We can customize the prose theme here if needed */
 .prose-teddy {
+  /* Override prose colors to match our theme */
   --tw-prose-body: var(--color-teddy-dark);
   --tw-prose-headings: var(--color-teddy-brown);
   --tw-prose-links: var(--color-teddy-light);
@@ -50,29 +54,4 @@
   --tw-prose-code: var(--color-teddy-brown);
   --tw-prose-pre-bg: var(--color-cream);
   --tw-prose-hr: var(--color-honey);
-}
-
-.prose {
-  line-height: 1.75;
-}
-
-.prose h1,
-.prose h2,
-.prose h3 {
-  margin-top: 2rem;
-  margin-bottom: 1rem;
-}
-
-.prose p {
-  margin-bottom: 1.25rem;
-}
-
-.prose ul {
-  list-style-type: disc;
-  padding-left: 1.5rem;
-  margin-bottom: 1.25rem;
-}
-
-.prose li {
-  margin-bottom: 0.5rem;
 }

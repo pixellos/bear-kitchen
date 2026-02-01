@@ -1,10 +1,12 @@
-import { type Component, createSignal, For, onMount, Show } from 'solid-js';
+import { type Component, createSignal, For, onMount, Show, createMemo } from 'solid-js';
 import { useNavigate, useParams } from '@solidjs/router';
 import { db, type Recipe } from '../db/db';
 import { Camera, Save, X, Plus, Hash, Image as ImageIcon, Sparkles, Loader2, BrainCircuit } from 'lucide-solid';
-import { SolidMarkdown } from 'solid-markdown';
+// import { SolidMarkdown } from 'solid-markdown'; // Removed
+import { marked } from 'marked';
+// import DOMPurify from 'dompurify';
 import Tesseract from 'tesseract.js';
-import { scanRecipeWithAI, cleanRecipeText } from '../utils/ai';
+import { scanRecipeWithAI, cleanRecipeText, cleanRecipeTextFree } from '../utils/ai';
 import clsx from 'clsx';
 import toast from 'solid-toast';
 import TurndownService from 'turndown';
@@ -27,6 +29,19 @@ const Editor: Component = () => {
     const [view, setView] = createSignal<'write' | 'preview'>('write');
     const [isScanning, setIsScanning] = createSignal(false);
     const [isAIScanning, setIsAIScanning] = createSignal(false);
+
+    // Derived signal for parsed markdown
+    const contentHtml = createMemo(() => {
+        const raw = content();
+        if (!raw) return '';
+        try {
+            const parsed = marked.parse(raw) as string;
+            return parsed; // DOMPurify.sanitize(parsed);
+        } catch (e) {
+            console.error('Markdown error:', e);
+            return '<p class="text-red-500">Error rendering markdown</p>';
+        }
+    });
 
     onMount(async () => {
         if (isEdit) {
@@ -91,11 +106,22 @@ const Editor: Component = () => {
             });
 
             if (text.trim()) {
-                const apiKey = localStorage.getItem('bear_kitchen_gemini_key') || DEFAULT_GEMINI_KEY;
+                // const apiKey = localStorage.getItem('bear_kitchen_gemini_key') || DEFAULT_GEMINI_KEY; // Unused
 
                 // Advanced Flow: Tesseract -> Clean with Gemini Text Mode
                 if (confirm('OCR Complete! Do you want AI to format and clean this text? 🧠✨')) {
-                    const result = await cleanRecipeText(apiKey, text);
+                    const savedKey = localStorage.getItem('bear_kitchen_gemini_key');
+                    const isCustomKey = savedKey && savedKey !== DEFAULT_GEMINI_KEY && savedKey.length > 10;
+
+                    let result;
+                    if (isCustomKey) {
+                        toast('Using Gemini AI... 💎');
+                        result = await cleanRecipeText(savedKey, text);
+                    } else {
+                        toast('Using Free AI (Pollinations)... 🐝');
+                        result = await cleanRecipeTextFree(text);
+                    }
+
                     if (result.title) setTitle(result.title);
                     if (result.content) setContent(result.content);
                     if (result.tags) {
@@ -188,7 +214,7 @@ const Editor: Component = () => {
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Main Editor Section */}
                 <div class="md:col-span-2 space-y-4">
-                    {/* Sticky Bottom Bar (Replaces Top Header and Floating Input) */}
+                    {/* Sticky Bottom Bar */}
                     <div class="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-honey/50 z-50 flex items-center justify-between shadow-lg animate-in slide-in-from-bottom-full duration-500">
                         <div class="flex-1 max-w-2xl mx-auto flex gap-4 items-center">
                             <button onClick={() => navigate('/')} class="p-2 text-teddy-light hover:bg-honey/10 rounded-full transition-colors flex-shrink-0">
@@ -226,9 +252,10 @@ const Editor: Component = () => {
 
                         <div class="flex-1 overflow-auto p-4">
                             <Show when={view() === 'write'} fallback={
-                                <article class="prose prose-teddy max-w-none">
-                                    <SolidMarkdown children={content()} />
-                                </article>
+                                <article
+                                    class="prose prose-teddy max-w-none"
+                                    innerHTML={contentHtml()}
+                                />
                             }>
                                 <textarea
                                     class="w-full h-full resize-none focus:outline-none text-teddy-dark font-mono text-lg"
