@@ -3,13 +3,20 @@ import { db } from '../db/db';
 import { Search, Utensils, Plus, Tag } from 'lucide-solid';
 import { A } from '@solidjs/router';
 import clsx from 'clsx';
+import ImageOverlay from '../components/ImageOverlay';
 
 const PREMADE_TAGS = ['meal', 'non-meal', 'breakfast', 'lunch', 'dinner', 'dessert', 'snack', 'veg'];
 
 const Home: Component = () => {
     const [searchQuery, setSearchQuery] = createSignal('');
+    const [fullscreenImg, setFullscreenImg] = createSignal<string | null>(null);
     const [recipes] = createResource(async () => {
-        return await db.recipes.orderBy('updatedAt').reverse().toArray();
+        try {
+            return await db.recipes.orderBy('updatedAt').reverse().toArray();
+        } catch (err) {
+            console.error('DB Fetch error:', err);
+            throw err;
+        }
     });
 
     const filteredRecipes = () => {
@@ -18,10 +25,16 @@ const Home: Component = () => {
         if (!list) return [];
         if (!query) return list;
 
-        return list.filter(r =>
-            r.title.toLowerCase().includes(query) ||
-            r.tags.some(t => t.toLowerCase().includes(query))
-        );
+        try {
+            return list.filter(r => {
+                const titleMatch = (r.title || '').toLowerCase().includes(query);
+                const tagMatch = (r.tags || []).some(t => (t || '').toLowerCase().includes(query));
+                return titleMatch || tagMatch;
+            });
+        } catch (err) {
+            console.error('Filtering error:', err);
+            return [];
+        }
     };
 
     const toggleFilter = (tag: string) => {
@@ -97,14 +110,20 @@ const Home: Component = () => {
                             <A href={`/recipe/${recipe.id}`} class="group">
                                 <article class="bear-card h-full flex flex-col gap-4 group-hover:scale-[1.02] transition-transform duration-300">
                                     {recipe.image && (Array.isArray(recipe.image) ? recipe.image.length > 0 : true) && (
-                                        <div class="aspect-video rounded-2xl overflow-hidden -mx-2 -mt-2">
+                                        <div class="aspect-video rounded-2xl overflow-hidden -mx-2 -mt-2 group/img relative">
                                             <img
                                                 src={(() => {
                                                     const img = Array.isArray(recipe.image) ? recipe.image[0] : recipe.image;
                                                     return typeof img === 'string' ? img : URL.createObjectURL(img as Blob);
                                                 })()}
                                                 alt={recipe.title}
-                                                class="w-full h-full object-cover"
+                                                class="w-full h-full object-cover cursor-zoom-in hover:scale-110 transition-transform duration-500"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    const img = Array.isArray(recipe.image) ? recipe.image[0] : recipe.image;
+                                                    setFullscreenImg(typeof img === 'string' ? img : URL.createObjectURL(img as Blob));
+                                                }}
                                             />
                                         </div>
                                     )}
@@ -133,6 +152,7 @@ const Home: Component = () => {
                     </For>
                 </Show>
             </div>
+            <ImageOverlay src={fullscreenImg()} onClose={() => setFullscreenImg(null)} />
         </div>
     );
 };

@@ -1,0 +1,18 @@
+
+Running 2 tests using 2 workers
+
+BROWSER LOG: [vite] connecting...
+BROWSER LOG: [vite] connected.
+BROWSER LOG: Fetching recipes from DB...
+BROWSER LOG: Recipes fetched: 0
+BROWSER LOG: Adding new recipe...
+BROWSER LOG: Recipe added with ID: 1
+BROWSER LOG: Navigating to Home...
+BROWSER LOG: Fetching recipes from DB...
+BROWSER LOG: Recipes fetched: 1
+Success! Recipe "Test Recipe 1769973155525" is visible on home page.
+  Γ£ô  1 [chromium] ΓÇ║ tests\recipe-flow.spec.ts:4:5 ΓÇ║ Recipe Creation and Home Page Display ΓÇ║ should create a recipe and see it on the home page (1.5s)
+Batch import verified!
+  Γ£ô  2 [chromium] ΓÇ║ tests\recipe-flow.spec.ts:46:5 ΓÇ║ Recipe Creation and Home Page Display ΓÇ║ should batch import multiple recipes (6.3s)
+
+  2 passed (7.5s)

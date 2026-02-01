@@ -1,13 +1,15 @@
-import { type Component, createResource, For, Show } from 'solid-js';
+import { type Component, createResource, For, Show, createSignal } from 'solid-js';
 import { useParams, useNavigate, A } from '@solidjs/router';
 import { db } from '../db/db';
 import { Edit2, Trash2, ArrowLeft, Clock, Tag } from 'lucide-solid';
+import ImageOverlay from '../components/ImageOverlay';
 // import { SolidMarkdown } from 'solid-markdown'; // Removed
 import { marked } from 'marked';
 
 const RecipeView: Component = () => {
     const params = useParams();
     const navigate = useNavigate();
+    const [fullscreenImg, setFullscreenImg] = createSignal<string | null>(null);
 
     const [recipe] = createResource(async () => {
         return await db.recipes.get(Number(params.id));
@@ -46,7 +48,8 @@ const RecipeView: Component = () => {
                                     <div class="flex-shrink-0 w-full h-full snap-center">
                                         <img
                                             src={typeof img === 'string' ? img : URL.createObjectURL(img as Blob)}
-                                            class="w-full h-full object-cover"
+                                            class="w-full h-full object-cover cursor-zoom-in hover:scale-105 transition-transform duration-500"
+                                            onClick={() => setFullscreenImg(typeof img === 'string' ? img : URL.createObjectURL(img as Blob))}
                                         />
                                     </div>
                                 )}
@@ -82,6 +85,7 @@ const RecipeView: Component = () => {
                         innerHTML={marked.parse(recipe()?.content || '') as string}
                     />
                 </div>
+                <ImageOverlay src={fullscreenImg()} onClose={() => setFullscreenImg(null)} />
             </div>
         </Show>
     );

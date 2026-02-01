@@ -1,0 +1,32 @@
+
+Running 1 test using 1 worker
+
+BROWSER LOG: [vite] connecting...
+BROWSER LOG: [vite] connected.
+BROWSER LOG: Fetching recipes from DB...
+BROWSER LOG: Recipes fetched: 0
+  Γ£ÿ  1 [chromium] ΓÇ║ tests\recipe-flow.spec.ts:4:5 ΓÇ║ Recipe Creation and Home Page Display ΓÇ║ should create a recipe and see it on the home page (30.0s)
+
+
+  1) [chromium] ΓÇ║ tests\recipe-flow.spec.ts:4:5 ΓÇ║ Recipe Creation and Home Page Display ΓÇ║ should create a recipe and see it on the home page 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('link', { name: /Add Recipe/i }).first()[22m
+
+
+      13 |
+      14 |         // 2. Click Add Recipe
+    > 15 |         await page.getByRole('link', { name: /Add Recipe/i }).first().click();
+         |                                                                       ^
+      16 |
+      17 |         // Verify we are on the edit/new page
+      18 |         await expect(page).toHaveURL(/.*\/new/);
+        at C:\Users\rogoz\.gemini\antigravity\playground\orbital-hypernova\tests\recipe-flow.spec.ts:15:71
+
+    Error Context: test-results\recipe-flow-Recipe-Creatio-e9b4c-and-see-it-on-the-home-page-chromium\error-context.md
+
+  1 failed
+    [chromium] ΓÇ║ tests\recipe-flow.spec.ts:4:5 ΓÇ║ Recipe Creation and Home Page Display ΓÇ║ should create a recipe and see it on the home page 
