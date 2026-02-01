@@ -5,7 +5,7 @@ export interface Recipe {
     title: string;
     content: string; // Markdown
     tags: string[];
-    image?: Blob | string;
+    image?: Blob | string | (Blob | string)[];
     createdAt: number;
     updatedAt: number;
     syncedAt?: number;

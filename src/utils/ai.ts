@@ -4,160 +4,84 @@ export interface AIRecipeResult {
     tags: string[];
 }
 
-export const scanRecipeWithAI = async (apiKey: string, base64Image: string): Promise<AIRecipeResult> => {
-    // Remove data:image/...;base64, prefix if present
-    const base64Data = base64Image.split(',')[1] || base64Image;
-
-    const prompt = `
-    Extract the food recipe from this image. 
-    Return the result strictly as a JSON object with the following structure:
-    {
-      "title": "Recipe Name",
-      "content": "Recipe content in clean Markdown format including ingredients and steps",
-      "tags": ["tag1", "tag2"]
-    }
-    Use common tags like: breakfast, lunch, dinner, meal, dessert, snack, meat, veg.
-    Only return the JSON object, no other text.
-  `;
-
-    const payload = {
-        contents: [{
-            parts: [
-                { text: prompt },
-                {
-                    inlineData: {
-                        mimeType: "image/jpeg",
-                        data: base64Data
-                    }
-                }
-            ]
-        }]
-    };
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-        const err = await response.json();
-        console.error("Gemini API Error:", err);
-        throw new Error(err.error?.message || "Gemini API request failed");
-    }
-
-    return parseGeminiResponse(await response.json());
-};
-
-export const cleanRecipeText = async (apiKey: string, rawText: string): Promise<AIRecipeResult> => {
-    const prompt = `
-    Analyze the following raw OCR text and extract a food recipe from it.
-    Return the result strictly as a JSON object with the following structure:
-    {
-      "title": "Recipe Name",
-      "content": "Recipe content in clean Markdown format including ingredients and steps",
-      "tags": ["tag1", "tag2"]
-    }
-    Use common tags like: breakfast, lunch, dinner, meal, dessert, snack, meat, veg.
-    Only return the JSON object, no other text.
-
-    RAW TEXT:
-    ${rawText}
-    `;
-
-    const payload = {
-        contents: [{
-            parts: [{ text: prompt }]
-        }]
-    };
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-        const err = await response.json();
-        console.error("Gemini Text API Error:", err);
-        throw new Error(err.error?.message || "Gemini API request failed");
-    }
-
-    return parseGeminiResponse(await response.json());
-};
-
+/**
+ * Uses Pollinations.ai (Free) to structure and clean up raw OCR text into a recipe.
+ * Optimized to prevent hallucinations and strictly follow the source text.
+ */
 export const cleanRecipeTextFree = async (rawText: string): Promise<AIRecipeResult> => {
     const prompt = `
-    Analyze the following raw OCR text and extract a food recipe from it.
-    Return the result strictly as a JSON object with the following structure:
-    {
-      "title": "Recipe Name",
-      "content": "Recipe content in clean Markdown format including ingredients and steps",
-      "tags": ["tag1", "tag2"]
-    }
-    Use common tags like: breakfast, lunch, dinner, meal, dessert, snack, meat, veg.
-    Only return the JSON object, no other text.
+    TASK: Act as a recipe transcription assistant. 
+    INPUT: Raw OCR text from one or more recipe photos.
+    
+    GOAL: 
+    1. Extract the dish title.
+    2. Extract ingredients and instructions strictly from the text.
+    3. Format the recipe in clean, beautiful Markdown.
+    4. Provide 3-5 relevant tags (e.g., breakfast, dessert, quick).
 
-    RAW TEXT:
+    CONSTRAINTS:
+    - DO NOT add extra steps, ingredients, or commentary that are not in the raw text.
+    - If the text is messy or missing parts, just do your best with what's available.
+    - Output MUST be a valid JSON object.
+
+    OUTPUT STRUCTURE:
+    {
+      "title": "Exact Recipe Name",
+      "content": "Full recipe in Markdown (Ingredients & Steps)",
+      "tags": ["tag1", "tag2", "tag3"]
+    }
+
+    RAW TEXT TO PROCESS:
+    ---
     ${rawText}
+    ---
+    
+    Return ONLY the JSON object.
     `;
 
-    // Pollinations.ai Text API
-    // Using a reliable model if possible, or default.
     const url = 'https://text.pollinations.ai/';
 
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            messages: [{ role: 'user', content: prompt }],
-            model: 'openai', // or 'mistral' or 'gpt-4o' if available freely
-            jsonMode: true // Hint to return JSON if supported
-        })
-    });
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                messages: [{ role: 'user', content: prompt }],
+                model: 'openai',
+                jsonMode: true
+            })
+        });
 
-    if (!response.ok) {
-        throw new Error(`Pollinations API failed: ${response.statusText}`);
-    }
+        if (!response.ok) {
+            throw new Error(`AI Service Error: ${response.statusText}`);
+        }
 
-    const text = await response.text();
+        const text = await response.text();
 
-    // Parse the text which should be the assistant's reply
-    // It might be raw JSON or wrapped.
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-        // Fallback: create a basic object if parsing fails
-        console.warn("Could not parse Free AI response as JSON", text);
+        // Robust JSON extraction
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+            return {
+                title: "Scanned Recipe",
+                content: rawText,
+                tags: ["scanned"]
+            };
+        }
+
+        const result = JSON.parse(jsonMatch[0]) as AIRecipeResult;
+
+        // Ensure values are strings/arrays as expected
         return {
-            title: "Scanned Recipe",
-            content: rawText, // Fallback to raw text
-            tags: ["ocr"]
+            title: result.title || "Untitled Recipe",
+            content: result.content || rawText,
+            tags: Array.isArray(result.tags) ? result.tags : []
+        };
+    } catch (e) {
+        console.error("Free AI Error:", e);
+        return {
+            title: "Scanned Recipe (Error)",
+            content: rawText,
+            tags: ["error"]
         };
     }
-
-    return JSON.parse(jsonMatch[0]) as AIRecipeResult;
-};
-
-const parseGeminiResponse = (result: any): AIRecipeResult => {
-    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!text) {
-        throw new Error("No response from Gemini");
-    }
-
-    // Try to parse JSON from the response (sometimes Gemini wraps it in ```json ... ```)
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-        throw new Error("Could not parse AI response as JSON");
-    }
-
-    return JSON.parse(jsonMatch[0]) as AIRecipeResult;
 };

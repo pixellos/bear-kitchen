@@ -1,18 +1,17 @@
 import { type Component, createSignal, For, onMount, Show, createMemo } from 'solid-js';
 import { useNavigate, useParams } from '@solidjs/router';
 import { db, type Recipe } from '../db/db';
-import { Camera, Save, X, Plus, Hash, Image as ImageIcon, Sparkles, Loader2, BrainCircuit } from 'lucide-solid';
+import { Save, X, Plus, Hash, Image as ImageIcon, Loader2, BrainCircuit } from 'lucide-solid';
 // import { SolidMarkdown } from 'solid-markdown'; // Removed
 import { marked } from 'marked';
 // import DOMPurify from 'dompurify';
 import Tesseract from 'tesseract.js';
-import { scanRecipeWithAI, cleanRecipeText, cleanRecipeTextFree } from '../utils/ai';
+import { cleanRecipeTextFree } from '../utils/ai';
 import clsx from 'clsx';
 import toast from 'solid-toast';
 import TurndownService from 'turndown';
 
 const PREMADE_TAGS = ['meal', 'non-meal', 'breakfast', 'lunch', 'dinner', 'dessert', 'snack', 'veg'];
-const DEFAULT_GEMINI_KEY = 'AIzaSyCy_w3atWUEd9ZBrZBVm-Qg64INXVUcMrA';
 
 const Editor: Component = () => {
     const params = useParams();
@@ -24,11 +23,10 @@ const Editor: Component = () => {
     const [content, setContent] = createSignal('');
     const [tags, setTags] = createSignal<string[]>([]);
     const [tagInput, setTagInput] = createSignal('');
-    const [image, setImage] = createSignal<string | Blob | null>(null);
-    const [previewUrl, setPreviewUrl] = createSignal<string | null>(null);
+    const [images, setImages] = createSignal<(string | Blob)[]>([]);
+    const [previewUrls, setPreviewUrls] = createSignal<string[]>([]);
     const [view, setView] = createSignal<'write' | 'preview'>('write');
     const [isScanning, setIsScanning] = createSignal(false);
-    const [isAIScanning, setIsAIScanning] = createSignal(false);
 
     // Derived signal for parsed markdown
     const contentHtml = createMemo(() => {
@@ -51,91 +49,55 @@ const Editor: Component = () => {
                 setContent(recipe.content);
                 setTags(recipe.tags);
                 if (recipe.image) {
-                    setImage(recipe.image);
-                    setPreviewUrl(typeof recipe.image === 'string' ? recipe.image : URL.createObjectURL(recipe.image as Blob));
+                    const imgs = Array.isArray(recipe.image) ? recipe.image : [recipe.image];
+                    setImages(imgs);
+                    setPreviewUrls(imgs.map(img => typeof img === 'string' ? img : URL.createObjectURL(img as Blob)));
                 }
             }
         }
     });
 
-    const aiScan = async () => {
-        const url = previewUrl();
-        if (!url) return toast.error('Please add a photo first! 🧸');
+    const scanRecipe = async () => {
+        const urls = previewUrls();
+        if (urls.length === 0) return toast.error('Please add at least one photo! 🧸');
 
-        setIsAIScanning(true);
+        setIsScanning(true);
+        let accumulatedText = '';
+
         try {
-            const apiKey = localStorage.getItem('bear_kitchen_gemini_key') || DEFAULT_GEMINI_KEY;
+            // Step 1: Sequential OCR
+            for (let i = 0; i < urls.length; i++) {
+                const url = urls[i];
+                toast(`OCR Scanning photo ${i + 1}/${urls.length}... 📝`);
 
-            // Get base64
-            const response = await fetch(url);
-            const blob = await response.blob();
-            const reader = new FileReader();
-            const base64Promise = new Promise<string>((resolve) => {
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.readAsDataURL(blob);
-            });
-            const base64 = await base64Promise;
+                const { data: { text } } = await Tesseract.recognize(url, 'eng');
+                if (text.trim()) {
+                    accumulatedText += `\n--- Photo ${i + 1} OCR ---\n${text.trim()}\n`;
+                }
+            }
 
-            // Simple "Magic" Scan (Image -> Recipe)
-            const result = await scanRecipeWithAI(apiKey, base64);
+            if (!accumulatedText.trim()) {
+                throw new Error('No text found in any of the photos. 🍯');
+            }
 
-            if (result.title) setTitle(result.title);
-            if (result.content) setContent(result.content);
+            // Step 2: AI Cleanup (Free AI Always)
+            toast('AI is organizing and formatting... 🐝✨');
+            const result = await cleanRecipeTextFree(accumulatedText);
+
+            if (result.title && !title()) setTitle(result.title);
+            if (result.content) {
+                setContent(prev => {
+                    const separator = prev ? '\n\n---\n\n' : '';
+                    return prev + separator + result.content;
+                });
+            }
             if (result.tags) {
                 const newTags = Array.from(new Set([...tags(), ...result.tags]));
                 setTags(newTags);
             }
 
-            toast.success('AI Magic complete! ✨');
-        } catch (e: any) {
-            console.error(e);
-            toast.error(`AI Scan failed: ${e.message || e}`);
-        } finally {
-            setIsAIScanning(false);
-        }
-    };
+            toast.success('Recipes processed and formatted! 🧼');
 
-    const scanRecipe = async () => {
-        const url = previewUrl();
-        if (!url) return toast.error('Please add a photo first! 🧸');
-
-        setIsScanning(true);
-        try {
-            const { data: { text } } = await Tesseract.recognize(url, 'eng', {
-                logger: m => console.log(m)
-            });
-
-            if (text.trim()) {
-                // const apiKey = localStorage.getItem('bear_kitchen_gemini_key') || DEFAULT_GEMINI_KEY; // Unused
-
-                // Advanced Flow: Tesseract -> Clean with Gemini Text Mode
-                if (confirm('OCR Complete! Do you want AI to format and clean this text? 🧠✨')) {
-                    const savedKey = localStorage.getItem('bear_kitchen_gemini_key');
-                    const isCustomKey = savedKey && savedKey !== DEFAULT_GEMINI_KEY && savedKey.length > 10;
-
-                    let result;
-                    if (isCustomKey) {
-                        toast('Using Gemini AI... 💎');
-                        result = await cleanRecipeText(savedKey, text);
-                    } else {
-                        toast('Using Free AI (Pollinations)... 🐝');
-                        result = await cleanRecipeTextFree(text);
-                    }
-
-                    if (result.title) setTitle(result.title);
-                    if (result.content) setContent(result.content);
-                    if (result.tags) {
-                        const newTags = Array.from(new Set([...tags(), ...result.tags]));
-                        setTags(newTags);
-                    }
-                    toast.success('Text cleaned and formatted! 🧼');
-                } else {
-                    setContent(prev => prev + (prev ? '\n\n---\n\n' : '') + text.trim());
-                    toast.success('Raw text added! 📝');
-                }
-            } else {
-                toast.error('Could not find any clear text in the photo. 🍯');
-            }
         } catch (e: any) {
             console.error(e);
             toast.error(`Scanning failed: ${e.message || e}`);
@@ -145,11 +107,20 @@ const Editor: Component = () => {
     };
 
     const handleImageChange = (e: Event) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (file) {
-            setImage(file);
-            setPreviewUrl(URL.createObjectURL(file));
+        const files = (e.target as HTMLInputElement).files;
+        if (files && files.length > 0) {
+            const newFiles = Array.from(files);
+            const newUrls = newFiles.map(file => URL.createObjectURL(file));
+
+            setImages(prev => [...prev, ...newFiles]);
+            setPreviewUrls(prev => [...prev, ...newUrls]);
+            toast(`Added ${files.length} photo(s)! 📸`);
         }
+    };
+
+    const removeImage = (index: number) => {
+        setPreviewUrls(prev => prev.filter((_, i) => i !== index));
+        setImages(prev => prev.filter((_, i) => i !== index));
     };
 
     const addTag = (val?: string) => {
@@ -171,7 +142,7 @@ const Editor: Component = () => {
             title: title(),
             content: content(),
             tags: tags(),
-            image: image() || undefined,
+            image: images(), // now an array
             updatedAt: Date.now(),
         };
 
@@ -271,62 +242,58 @@ const Editor: Component = () => {
 
                 {/* Sidebar Controls */}
                 <div class="space-y-6">
-                    {/* Image Upload & AI Magic */}
+                    {/* Images & AI Processing */}
                     <div class="bear-card">
                         <h4 class="font-bold flex items-center justify-between mb-4">
                             <div class="flex items-center gap-2">
                                 <ImageIcon size={18} class="text-teddy-brown" />
-                                Recipe Photo
+                                Recipe Photos ({previewUrls().length})
                             </div>
                         </h4>
 
-                        <div
-                            class="aspect-square rounded-2xl bg-honey/10 border-4 border-dashed border-honey flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer"
-                            onClick={() => document.getElementById('image-upload')?.click()}
-                        >
-                            <Show when={previewUrl()} fallback={
-                                <div class="text-center p-4">
-                                    <div class="bg-honey/30 p-4 rounded-full inline-block mb-3">
-                                        <Camera size={32} class="text-teddy-brown" />
+                        <div class="grid grid-cols-2 gap-2 mb-4">
+                            <For each={previewUrls()}>
+                                {(url, index) => (
+                                    <div class="aspect-square rounded-xl bg-honey/10 border-2 border-honey relative overflow-hidden group">
+                                        <img src={url} class="w-full h-full object-cover" />
+                                        <button
+                                            onClick={() => removeImage(index())}
+                                            class="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <X size={14} />
+                                        </button>
                                     </div>
-                                    <p class="text-sm font-bold text-teddy-light">Add a tasty photo</p>
-                                </div>
-                            }>
-                                <img src={previewUrl()!} class="w-full h-full object-cover" />
-                                <div class="absolute inset-0 bg-teddy-brown/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                    <span class="text-white font-bold bg-teddy-brown/80 px-4 py-2 rounded-full">Change</span>
-                                </div>
+                                )}
+                            </For>
+                            <button
+                                class="aspect-square rounded-xl bg-honey/5 border-2 border-dashed border-honey/40 flex flex-col items-center justify-center hover:bg-honey/10 transition-colors"
+                                onClick={() => document.getElementById('image-upload')?.click()}
+                            >
+                                <Plus size={24} class="text-teddy-light" />
+                                <span class="text-[10px] font-bold text-teddy-light mt-1">Add Photo</span>
+                            </button>
+                        </div>
+
+                        <input
+                            id="image-upload"
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            class="hidden"
+                            onChange={handleImageChange}
+                        />
+
+                        {/* Processing Button */}
+                        <button
+                            onClick={scanRecipe}
+                            disabled={isScanning() || previewUrls().length === 0}
+                            class="w-full bg-teddy-brown text-white font-black py-4 rounded-xl hover:bg-teddy-dark transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            <Show when={isScanning()} fallback={<BrainCircuit size={20} />}>
+                                <Loader2 size={20} class="animate-spin" />
                             </Show>
-                            <input
-                                id="image-upload"
-                                type="file"
-                                accept="image/*"
-                                class="hidden"
-                                onChange={handleImageChange}
-                            />
-                        </div>
-
-                        {/* Scan Buttons */}
-                        <div class="mt-4 grid grid-cols-1 gap-2">
-                            <button
-                                onClick={aiScan}
-                                disabled={isAIScanning() || !previewUrl()}
-                                class="w-full bg-teddy-brown text-white font-black py-3 rounded-xl hover:bg-teddy-dark transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
-                            >
-                                <Show when={isAIScanning()} fallback={<BrainCircuit size={18} />}>
-                                    <Loader2 size={18} class="animate-spin" />
-                                </Show>
-                                {isAIScanning() ? 'Gemini is Thinking...' : 'AI Magic Scan ✨'}
-                            </button>
-
-                            <button
-                                onClick={scanRecipe}
-                                disabled={isScanning() || !previewUrl()}
-                                class="w-full text-teddy-light hover:text-teddy-brown text-xs font-bold py-1 flex items-center justify-center gap-1 opacity-60 hover:opacity-100"
-                            >
-                                <Sparkles size={12} /> Simple OCR Scan (with Tesseract)
-                            </button>
-                        </div>
+                            {isScanning() ? 'Processesing Photos...' : 'Magic AI Scan ✨'}
+                        </button>
                     </div>
 
                     {/* Tags */}

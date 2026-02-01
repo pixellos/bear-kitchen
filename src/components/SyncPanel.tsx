@@ -9,8 +9,6 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
     const DEFAULT_CLIENT_ID = '924117517575-jm3a3911vbrusf356d11p6nag7paps0k.apps.googleusercontent.com';
     const [clientId, setClientId] = createSignal(localStorage.getItem('bear_kitchen_g_client_id') || DEFAULT_CLIENT_ID);
     const [showSettings, setShowSettings] = createSignal(!localStorage.getItem('bear_kitchen_g_client_id'));
-    const DEFAULT_GEMINI_KEY = 'AIzaSyCy_w3atWUEd9ZBrZBVm-Qg64INXVUcMrA';
-    const [apiKey, setApiKey] = createSignal(localStorage.getItem('bear_kitchen_gemini_key') || DEFAULT_GEMINI_KEY);
     const [isReady, setIsReady] = createSignal(false);
 
     onMount(() => {
@@ -35,7 +33,6 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
     const saveSettings = () => {
         if (clientId()) {
             localStorage.setItem('bear_kitchen_g_client_id', clientId());
-            localStorage.setItem('bear_kitchen_gemini_key', apiKey());
             initializeGoogle(clientId());
             setShowSettings(false);
         }
@@ -190,19 +187,6 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
                                     />
                                 </div>
 
-                                <div class="border-t border-honey/20 pt-3 space-y-2">
-                                    <p class="font-bold text-teddy-brown underline">Gemini AI Key</p>
-                                    <p class="text-[10px] text-teddy-light">Required for AI Magic. A default key is provided, but you can use your own free one from <a href="https://aistudio.google.com/" target="_blank" class="underline hover:text-teddy-brown">Google AI Studio</a>.</p>
-                                    <input
-                                        type="password"
-                                        placeholder="Gemini API Key (Leave empty to use default)"
-                                        class="bear-input w-full text-xs"
-                                        value={apiKey() === DEFAULT_GEMINI_KEY ? '' : apiKey()}
-                                        onInput={(e) => setApiKey(e.currentTarget.value || DEFAULT_GEMINI_KEY)}
-                                    />
-                                    <p class="text-[10px] text-teddy-light/70">{apiKey() === DEFAULT_GEMINI_KEY ? 'Using Default Key 🔑' : 'Using Custom Key ✨'}</p>
-                                </div>
-
                                 <button onClick={saveSettings} class="w-full bg-teddy-brown text-white rounded-lg py-2 text-xs font-bold hover:bg-teddy-dark transition-colors">
                                     Save Settings & Connect
                                 </button>
@@ -250,8 +234,8 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
                         </label>
                     </div>
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
 
