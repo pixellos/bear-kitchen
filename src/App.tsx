@@ -3,6 +3,7 @@ import { Router, Route } from '@solidjs/router';
 import Home from './pages/Home';
 import Editor from './pages/Editor';
 import RecipeView from './pages/RecipeView';
+import Planner from './pages/Planner';
 import Layout from './components/Layout';
 import { Toaster } from 'solid-toast';
 
@@ -28,6 +29,7 @@ const App: Component = () => {
           <Route path="/new" component={Editor} />
           <Route path="/edit/:id" component={Editor} />
           <Route path="/recipe/:id" component={RecipeView} />
+          <Route path="/planner" component={Planner} />
         </Route>
       </Router>
     </>

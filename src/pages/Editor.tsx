@@ -27,6 +27,7 @@ const Editor: Component = () => {
     const [previewUrls, setPreviewUrls] = createSignal<string[]>([]);
     const [view, setView] = createSignal<'write' | 'preview'>('write');
     const [isScanning, setIsScanning] = createSignal(false);
+    const [isBatchMode, setIsBatchMode] = createSignal(false);
 
     // Derived signal for parsed markdown
     const contentHtml = createMemo(() => {
@@ -62,41 +63,75 @@ const Editor: Component = () => {
         if (urls.length === 0) return toast.error('Please add at least one photo! 🧸');
 
         setIsScanning(true);
-        let accumulatedText = '';
 
         try {
-            // Step 1: Sequential OCR
-            for (let i = 0; i < urls.length; i++) {
-                const url = urls[i];
-                toast(`OCR Scanning photo ${i + 1}/${urls.length}... 📝`);
+            if (isBatchMode()) {
+                // Batch Mode: 1 Photo = 1 Recipe
+                let successCount = 0;
 
-                const { data: { text } } = await Tesseract.recognize(url, 'eng');
-                if (text.trim()) {
-                    accumulatedText += `\n--- Photo ${i + 1} OCR ---\n${text.trim()}\n`;
+                for (let i = 0; i < urls.length; i++) {
+                    const url = urls[i];
+                    toast(`Processing recipe ${i + 1}/${urls.length}... 🐝`);
+
+                    // OCR
+                    const { data: { text } } = await Tesseract.recognize(url, 'eng');
+                    if (!text.trim()) continue;
+
+                    // AI Clean
+                    const result = await cleanRecipeTextFree(text);
+
+                    // Add to DB
+                    await db.recipes.add({
+                        title: result.title || `Scanned Recipe ${new Date().toLocaleDateString()}`,
+                        content: result.content || text,
+                        tags: result.tags || [],
+                        image: images()[i], // Associate specific image
+                        createdAt: Date.now(),
+                        updatedAt: Date.now()
+                    } as Recipe);
+
+                    successCount++;
                 }
-            }
 
-            if (!accumulatedText.trim()) {
-                throw new Error('No text found in any of the photos. 🍯');
-            }
+                toast.success(`Batch complete! Added ${successCount} recipes! 🥳`);
+                navigate('/'); // Go home to see them
 
-            // Step 2: AI Cleanup (Free AI Always)
-            toast('AI is organizing and formatting... 🐝✨');
-            const result = await cleanRecipeTextFree(accumulatedText);
+            } else {
+                // Merge Mode (Original behavior)
+                let accumulatedText = '';
+                // Step 1: Sequential OCR
+                for (let i = 0; i < urls.length; i++) {
+                    const url = urls[i];
+                    toast(`OCR Scanning photo ${i + 1}/${urls.length}... 📝`);
 
-            if (result.title && !title()) setTitle(result.title);
-            if (result.content) {
-                setContent(prev => {
-                    const separator = prev ? '\n\n---\n\n' : '';
-                    return prev + separator + result.content;
-                });
-            }
-            if (result.tags) {
-                const newTags = Array.from(new Set([...tags(), ...result.tags]));
-                setTags(newTags);
-            }
+                    const { data: { text } } = await Tesseract.recognize(url, 'eng');
+                    if (text.trim()) {
+                        accumulatedText += `\n--- Photo ${i + 1} OCR ---\n${text.trim()}\n`;
+                    }
+                }
 
-            toast.success('Recipes processed and formatted! 🧼');
+                if (!accumulatedText.trim()) {
+                    throw new Error('No text found in any of the photos. 🍯');
+                }
+
+                // Step 2: AI Cleanup (Free AI Always)
+                toast('AI is organizing and formatting... 🐝✨');
+                const result = await cleanRecipeTextFree(accumulatedText);
+
+                if (result.title && !title()) setTitle(result.title);
+                if (result.content) {
+                    setContent(prev => {
+                        const separator = prev ? '\n\n---\n\n' : '';
+                        return prev + separator + result.content;
+                    });
+                }
+                if (result.tags) {
+                    const newTags = Array.from(new Set([...tags(), ...result.tags]));
+                    setTags(newTags);
+                }
+
+                toast.success('Recipes processed and formatted! 🧼');
+            }
 
         } catch (e: any) {
             console.error(e);
@@ -182,7 +217,7 @@ const Editor: Component = () => {
     return (
         <div class="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24 relative">
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="flex flex-col-reverse md:grid md:grid-cols-3 gap-6">
                 {/* Main Editor Section */}
                 <div class="md:col-span-2 space-y-4">
                     {/* Sticky Bottom Bar */}
@@ -249,6 +284,18 @@ const Editor: Component = () => {
                                 <ImageIcon size={18} class="text-teddy-brown" />
                                 Recipe Photos ({previewUrls().length})
                             </div>
+                            <button
+                                onClick={() => setIsBatchMode(!isBatchMode())}
+                                class={clsx(
+                                    "text-[10px] font-bold px-2 py-1 rounded-lg border transition-all flex items-center gap-1",
+                                    isBatchMode()
+                                        ? "bg-honey text-teddy-brown border-honey"
+                                        : "bg-transparent text-teddy-light border-honey/20"
+                                )}
+                                title={isBatchMode() ? "Batch Mode: Each photo becomes a separate recipe" : "Merge Mode: All photos combined into one recipe"}
+                            >
+                                {isBatchMode() ? '⚡ Batch Mode' : '🔗 Merge Mode'}
+                            </button>
                         </h4>
 
                         <div class="grid grid-cols-2 gap-2 mb-4">

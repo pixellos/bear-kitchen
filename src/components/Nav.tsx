@@ -1,6 +1,6 @@
 import { type Component, createSignal, Show } from 'solid-js';
 import { A } from '@solidjs/router';
-import { Utensils, Plus, Cloud } from 'lucide-solid';
+import { Utensils, Plus, Cloud, Calendar } from 'lucide-solid';
 import SyncPanel from './SyncPanel';
 
 const Nav: Component = () => {
@@ -19,6 +19,13 @@ const Nav: Component = () => {
                 </A>
 
                 <div class="flex items-center gap-4">
+                    <A
+                        href="/planner"
+                        class="p-2 text-teddy-light hover:text-teddy-brown transition-colors"
+                        title="Week Planner"
+                    >
+                        <Calendar size={24} />
+                    </A>
                     <button
                         class="p-2 text-teddy-light hover:text-teddy-brown transition-colors"
                         title="Sync with Google"
