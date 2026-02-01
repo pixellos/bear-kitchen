@@ -8,7 +8,9 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
     const [status, setStatus] = createSignal('');
     const DEFAULT_CLIENT_ID = '924117517575-jm3a3911vbrusf356d11p6nag7paps0k.apps.googleusercontent.com';
     const [clientId, setClientId] = createSignal(localStorage.getItem('bear_kitchen_g_client_id') || DEFAULT_CLIENT_ID);
-    const [showSettings, setShowSettings] = createSignal(!localStorage.getItem('bear_kitchen_g_client_id') || !localStorage.getItem('bear_kitchen_gemini_key'));
+    const [showSettings, setShowSettings] = createSignal(!localStorage.getItem('bear_kitchen_g_client_id'));
+    const DEFAULT_GEMINI_KEY = 'AIzaSyCy_w3atWUEd9ZBrZBVm-Qg64INXVUcMrA';
+    const [apiKey, setApiKey] = createSignal(localStorage.getItem('bear_kitchen_gemini_key') || DEFAULT_GEMINI_KEY);
     const [isReady, setIsReady] = createSignal(false);
 
     onMount(() => {
@@ -33,6 +35,7 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
     const saveSettings = () => {
         if (clientId()) {
             localStorage.setItem('bear_kitchen_g_client_id', clientId());
+            localStorage.setItem('bear_kitchen_gemini_key', apiKey());
             initializeGoogle(clientId());
             setShowSettings(false);
         }
@@ -180,8 +183,8 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
                                         type="password"
                                         placeholder="Optional Standalone Gemini Key"
                                         class="bear-input w-full text-xs"
-                                        value={localStorage.getItem('bear_kitchen_gemini_key') || ''}
-                                        onInput={(e) => localStorage.setItem('bear_kitchen_gemini_key', e.currentTarget.value)}
+                                        value={apiKey()}
+                                        onInput={(e) => setApiKey(e.currentTarget.value)}
                                     />
                                 </div>
 
