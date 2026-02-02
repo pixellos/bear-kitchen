@@ -1,5 +1,5 @@
 import { type Component, createSignal, onMount, Show } from 'solid-js';
-import { db, type Recipe } from '../db/db';
+import { db, type Recipe, type WeekPlan } from '../db/db';
 import { Download, Upload, Cloud, RefreshCw, X, Edit2 } from 'lucide-solid';
 import { loadGoogleScripts, requestAccessToken, findOrCreateFolder, findFile, uploadFile, downloadFile } from '../utils/googleDrive';
 
@@ -68,9 +68,25 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
                 }
             }
 
-            setStatus('Uploading local library... ⬆️');
+            setStatus('Checking for plans... 📅');
+            const plansFile = await findFile(folderId, 'plans.json');
+            if (plansFile) {
+                setStatus('Downloading remote plans... ⬇️');
+                const content = await downloadFile(plansFile.id!);
+                try {
+                    const remotePlans: WeekPlan[] = JSON.parse(content);
+                    await db.plans.bulkPut(remotePlans);
+                } catch (e) {
+                    console.error("Plans merge error", e);
+                }
+            }
+
+            setStatus('Uploading library... ⬆️');
             const localRecipes = await db.recipes.toArray();
             await uploadFile(folderId, 'recipes.json', JSON.stringify(localRecipes, null, 2), file?.id);
+
+            const localPlans = await db.plans.toArray();
+            await uploadFile(folderId, 'plans.json', JSON.stringify(localPlans, null, 2), plansFile?.id);
 
             setStatus('Sync Complete! 🎉');
             setTimeout(() => setStatus(''), 5000);
@@ -113,7 +129,8 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
             return { ...r, image: updatedImage };
         }));
 
-        const data = JSON.stringify(recipesWithBase64, null, 2);
+        const plans = await db.plans.toArray();
+        const data = JSON.stringify({ recipes: recipesWithBase64, plans }, null, 2);
         const blob = new Blob([data], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -132,12 +149,23 @@ const SyncPanel: Component<{ onClose: () => void }> = (props) => {
         const reader = new FileReader();
         reader.onload = async (ev) => {
             try {
-                const data = JSON.parse(ev.target?.result as string);
-                for (const recipe of data) {
-                    const { id, ...rest } = recipe;
-                    await db.recipes.add(rest);
+                const { recipes, plans } = JSON.parse(ev.target?.result as string);
+                
+                if (recipes) {
+                    for (const recipe of recipes) {
+                        const { id, ...rest } = recipe;
+                        await db.recipes.add(rest);
+                    }
                 }
-                alert('Recipes imported! 🐾');
+
+                if (plans) {
+                    for (const plan of plans) {
+                        const { id, ...rest } = plan;
+                        await db.plans.add(rest);
+                    }
+                }
+
+                alert('Library imported! 🐾');
                 window.location.reload();
             } catch (err) {
                 alert('Failed to import. Is the file valid? 🍯');

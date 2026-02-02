@@ -6,7 +6,6 @@ import clsx from 'clsx';
 import toast from 'solid-toast';
 import { getFirstImageUrl } from '../utils/imageUtils';
 import { generateShoppingList } from '../utils/ai';
-import ShoppingListModal from '../components/ShoppingListModal';
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
 
@@ -17,7 +16,9 @@ const Planner: Component = () => {
     const [isAddModalOpen, setIsAddModalOpen] = createSignal(false);
     const [selectedDay, setSelectedDay] = createSignal<typeof DAYS[number] | null>(null);
     const [shoppingListContent, setShoppingListContent] = createSignal<string | null>(null);
+    const [templateName, setTemplateName] = createSignal('');
     const [isGeneratingList, setIsGeneratingList] = createSignal(false);
+    const [showSidebar, setShowSidebar] = createSignal(false);
 
     // Helpers
     function getMonday(d: Date) {
@@ -56,6 +57,8 @@ const Planner: Component = () => {
             // Let's just keep it in memory until save
         }
         setPlan(p);
+        setTemplateName(p.name || '');
+        setShoppingListContent(p.shoppingList || null);
     };
 
     onMount(async () => {
@@ -130,10 +133,39 @@ const Planner: Component = () => {
             const recipes = recipeIds.map(id => getRecipe(id)).filter((r): r is Recipe => !!r);
             const list = await generateShoppingList(recipes);
             setShoppingListContent(list);
+
+            // Auto-save the list
+            const currentPlan = plan();
+            if (currentPlan?.id) {
+                await db.plans.update(currentPlan.id, { shoppingList: list });
+            }
         } catch (e) {
             toast.error('Failed to generate list. 🐻');
         } finally {
             setIsGeneratingList(false);
+        }
+    };
+
+    const saveTemplateName = async (name: string) => {
+        setTemplateName(name);
+        const currentPlan = plan();
+        if (currentPlan) {
+            const updatedPlan = { ...currentPlan, name };
+            setPlan(updatedPlan);
+            if (currentPlan.id) {
+                await db.plans.update(currentPlan.id, { name });
+            } else {
+                const id = await db.plans.add(updatedPlan);
+                setPlan({ ...updatedPlan, id: id as number });
+            }
+        }
+    };
+
+    const updateShoppingListLocal = async (content: string) => {
+        setShoppingListContent(content);
+        const currentPlan = plan();
+        if (currentPlan?.id) {
+            await db.plans.update(currentPlan.id, { shoppingList: content });
         }
     };
 
@@ -147,9 +179,15 @@ const Planner: Component = () => {
                     <div class="bg-honey/20 p-3 rounded-full text-teddy-brown">
                         <Calendar size={24} />
                     </div>
-                    <div>
-                        <h2 class="text-2xl font-black text-teddy-brown">Week Template Manager</h2>
-                        <p class="text-teddy-light font-bold">
+                    <div class="flex-1">
+                        <input
+                            type="text"
+                            placeholder="Template Name (e.g. Italian Week)..."
+                            class="bg-transparent border-b-2 border-honey/20 focus:border-honey outline-none text-2xl font-black text-teddy-brown w-full placeholder:text-teddy-light/40"
+                            value={templateName()}
+                            onInput={(e) => saveTemplateName(e.currentTarget.value)}
+                        />
+                        <p class="text-teddy-light font-bold text-sm">
                             {formatDate(weekStart())} - {formatDate(getDayDate(6))}
                         </p>
                     </div>
@@ -157,14 +195,11 @@ const Planner: Component = () => {
 
                 <div class="flex flex-wrap items-center gap-4">
                     <button
-                        onClick={handleGenerateList}
-                        disabled={isGeneratingList()}
-                        class="bg-teddy-brown text-white px-6 py-2 rounded-full font-black flex items-center gap-2 hover:bg-teddy-dark transition-all disabled:opacity-50 shadow-md"
+                        onClick={() => setShowSidebar(true)}
+                        class="bg-honey text-teddy-brown px-6 py-2 rounded-full font-black flex items-center gap-2 hover:bg-amber-400 transition-all shadow-md"
                     >
-                        <Show when={isGeneratingList()} fallback={<ShoppingCart size={18} />}>
-                            <Loader2 size={18} class="animate-spin" />
-                        </Show>
-                        {isGeneratingList() ? 'Generating...' : 'Magic Shopping List ✨'}
+                        <ShoppingCart size={18} />
+                        Shopping List
                     </button>
 
                     <div class="flex items-center gap-2 bg-honey/10 p-1 rounded-full">
@@ -207,28 +242,23 @@ const Planner: Component = () => {
                                     {(recipeId) => {
                                         const r = getRecipe(recipeId);
                                         return (
-                                            <div class="bg-white p-2 rounded-xl shadow-sm border border-honey/10 group relative hover:shadow-md transition-shadow flex gap-2">
+                                            <div class="bg-white rounded-2xl shadow-sm border border-honey/10 group relative hover:shadow-md transition-all flex flex-col overflow-hidden">
                                                 <Show when={r}>
                                                     {getFirstImageUrl(r?.image) && (
-                                                        <div class="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0">
-                                                            <img src={getFirstImageUrl(r?.image)} class="w-full h-full object-cover" />
+                                                        <div class="aspect-[4/3] w-full overflow-hidden">
+                                                            <img src={getFirstImageUrl(r?.image)} class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                                                         </div>
                                                     )}
-                                                    <div class="flex-1 min-w-0">
-                                                        <div class="text-[11px] font-bold text-teddy-brown line-clamp-2 leading-tight mb-1">
+                                                    <div class="p-2">
+                                                        <div class="text-[11px] font-bold text-teddy-brown line-clamp-2 leading-tight">
                                                             {r?.title}
-                                                        </div>
-                                                        <div class="flex gap-1 flex-wrap">
-                                                            <For each={r?.tags.slice(0, 1)}>
-                                                                {t => <span class="text-[8px] bg-honey/10 px-1 py-0.5 rounded text-teddy-light font-bold">{t}</span>}
-                                                            </For>
                                                         </div>
                                                     </div>
                                                     <button
                                                         onClick={() => removeFromPlan(day, recipeId)}
-                                                        class="absolute -top-1 -right-1 bg-red-100 text-red-500 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10"
+                                                        class="absolute top-1 right-1 bg-white/80 backdrop-blur-sm text-red-500 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10 hover:bg-red-50"
                                                     >
-                                                        <Trash2 size={10} />
+                                                        <Trash2 size={12} />
                                                     </button>
                                                 </Show>
                                             </div>
@@ -282,10 +312,62 @@ const Planner: Component = () => {
                 </div>
             </Show>
 
-            <ShoppingListModal
-                content={shoppingListContent()}
-                onClose={() => setShoppingListContent(null)}
-            />
+            {/* Sidebar Shopping List */}
+            <div class={clsx(
+                "fixed inset-y-0 left-0 z-[70] w-full sm:w-[400px] bg-white shadow-2xl transform transition-transform duration-300 ease-in-out p-6 flex flex-col",
+                showSidebar() ? "translate-x-0" : "-translate-x-full"
+            )}>
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-honey/20 p-2 rounded-full text-teddy-brown">
+                            <ShoppingCart size={24} />
+                        </div>
+                        <h3 class="text-xl font-black text-teddy-brown">Shopping List</h3>
+                    </div>
+                    <button onClick={() => setShowSidebar(false)} class="text-teddy-light hover:text-teddy-brown">
+                        <X size={28} />
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto mb-4 bg-old-lace/30 rounded-3xl p-4 border-2 border-honey/10">
+                    <Show when={shoppingListContent()} fallback={
+                        <div class="h-full flex flex-col items-center justify-center text-center p-8 space-y-4">
+                            <div class="text-4xl opacity-50">🛒</div>
+                            <p class="text-teddy-light font-bold">No shopping list yet. Generate one to start!</p>
+                        </div>
+                    }>
+                        <div class="prose prose-sm prose-teddy max-w-none">
+                            <textarea
+                                class="w-full h-full min-h-[400px] bg-transparent outline-none font-medium text-teddy-brown font-mono text-xs leading-relaxed"
+                                value={shoppingListContent()!}
+                                onInput={(e) => updateShoppingListLocal(e.currentTarget.value)}
+                            />
+                        </div>
+                    </Show>
+                </div>
+
+                <div class="space-y-3">
+                    <button
+                        onClick={handleGenerateList}
+                        disabled={isGeneratingList()}
+                        class="w-full bg-teddy-brown text-white py-4 rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-teddy-dark transition-all disabled:opacity-50 shadow-md"
+                    >
+                        <Show when={isGeneratingList()} fallback={<Plus size={20} />}>
+                            <Loader2 size={20} class="animate-spin" />
+                        </Show>
+                        {isGeneratingList() ? 'Magic Generating...' : 'Magic Re-Scan ✨'}
+                    </button>
+                    <p class="text-[10px] text-center text-teddy-light font-bold">Units: Polish (kg/litry) 🇵🇱</p>
+                </div>
+            </div>
+
+            {/* Backdrop for sidebar */}
+            <Show when={showSidebar()}>
+                <div
+                    class="fixed inset-0 bg-black/20 backdrop-blur-sm z-[65] animate-in fade-in duration-300"
+                    onClick={() => setShowSidebar(false)}
+                />
+            </Show>
         </div>
     );
 };

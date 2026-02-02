@@ -14,6 +14,7 @@ export interface Recipe {
 export interface WeekPlan {
     id?: number;
     weekStart: string; // ISO date string of Monday
+    name?: string; // Optional template name
     days: {
         monday: number[];
         tuesday: number[];
@@ -23,6 +24,7 @@ export interface WeekPlan {
         saturday: number[];
         sunday: number[];
     };
+    shoppingList?: string; // Persistent shopping list in markdown
 }
 
 export class MyDatabase extends Dexie {
@@ -39,6 +41,12 @@ export class MyDatabase extends Dexie {
         this.version(2).stores({
             recipes: '++id, title, *tags, createdAt, updatedAt', // Keep existing
             plans: '++id, weekStart'
+        });
+
+        // Version 3: Added name and shoppingList (name as index)
+        this.version(3).stores({
+            recipes: '++id, title, *tags, createdAt, updatedAt',
+            plans: '++id, weekStart, name'
         });
     }
 }

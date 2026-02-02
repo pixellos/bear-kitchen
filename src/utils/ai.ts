@@ -102,12 +102,13 @@ export const generateShoppingList = async (recipes: { title: string; content: st
     1. Extract all ingredients from the recipes.
     2. Consolidate them into a single, organized shopping list (e.g., Produce, Dairy, Pantry).
     3. Sum up quantities where possible (e.g., if two recipes need 2 eggs, list "4 Eggs").
-    4. Format the output in clean, readable Markdown with checkboxes [ ].
+    4. **CRITICAL: Use Polish units (kg, gramy, litry/ml)**. Convert smaller units to larger ones where appropriate (e.g., 1000g -> 1kg).
+    5. Format the output in clean, readable Markdown with checkboxes [ ].
     
     CONSTRAINTS:
     - Keep it concise.
     - If quantities are unclear, just list the ingredient.
-    - DO NOT add items that aren't in the recipes unless they are obvious staples (like salt/pepper) if the recipe implies them but doesn't list them.
+    - DO NOT add items that aren't in the recipes unless they are obvious staples.
     
     RECIPES TO PROCESS:
     ---
